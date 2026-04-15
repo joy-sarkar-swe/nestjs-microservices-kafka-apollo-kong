@@ -1,0 +1,63 @@
+# =============================================================================
+# Apollo Router — Runtime Configuration
+# =============================================================================
+#
+# Reference: https://www.apollographql.com/docs/router/configuration/overview
+#
+# START COMMAND (from apollo-router/ directory):
+#   ./router --config router.yaml --supergraph supergraph.graphql
+#
+# The Router reads supergraph.graphql (the composed SDL) at startup and uses
+# router.yaml for runtime behaviour: CORS, headers, telemetry, plugins, etc.
+# =============================================================================
+
+# ── Supergraph ─────────────────────────────────────────────────────────────
+# The Router listens for GraphQL requests on this address.
+supergraph:
+  listen: 0.0.0.0:4000
+
+# ── CORS ───────────────────────────────────────────────────────────────────
+# Allow the GraphQL Playground (opened from a browser) to send requests.
+cors:
+  allow_any_origin: true
+  allow_headers:
+    - content-type
+    - x-correlation-id
+    - authorization
+
+# ── Homepage (GraphQL Sandbox) ─────────────────────────────────────────────
+# Enables the embedded Apollo Sandbox at http://localhost:4000
+homepage:
+  enabled: true
+
+# ── Sandbox ────────────────────────────────────────────────────────────────
+sandbox:
+  enabled: true
+
+# ── Introspection ──────────────────────────────────────────────────────────
+# Must be enabled for the Sandbox and for rover to work.
+include_subgraph_errors:
+  all: true   # Surface subgraph errors in dev; disable in production
+
+# ── Health check ───────────────────────────────────────────────────────────
+# GET http://localhost:4000/health → { "status": "pass" }
+health_check:
+  listen: 0.0.0.0:4000
+  enabled: true
+  path: /health
+
+# ── Headers — forward correlation id to subgraphs ─────────────────────────
+# Any header propagation rules go here. Example:
+# headers:
+#   all:
+#     request:
+#       - propagate:
+#           named: x-correlation-id
+
+# ── Telemetry (optional, extend in production) ────────────────────────────
+# telemetry:
+#   exporters:
+#     tracing:
+#       otlp:
+#         endpoint: http://localhost:4317
+#         protocol: grpc
