@@ -196,6 +196,22 @@ type FieldError
   message: String!
 }
 
+"""Arguments for fetching a blog post by ID"""
+input GetBlogArgs
+  @join__type(graph: BLOG_SERVICE)
+{
+  """UUID of the blog post to fetch"""
+  id: ID!
+}
+
+"""Arguments for fetching a user by ID"""
+input GetUserArgs
+  @join__type(graph: USER_SERVICE)
+{
+  """UUID of the user to fetch"""
+  id: ID!
+}
+
 scalar join__FieldSet
 
 enum join__Graph {
@@ -250,7 +266,7 @@ type Query
   """
   Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
   """
-  getBlog(id: String!): BlogResponse! @join__field(graph: BLOG_SERVICE)
+  getBlog(input: GetBlogArgs!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
   """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
   getUsers: UsersResponse! @join__field(graph: USER_SERVICE)
@@ -258,7 +274,7 @@ type Query
   """
   Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
   """
-  getUser(id: String!): UserResponse! @join__field(graph: USER_SERVICE)
+  getUser(input: GetUserArgs!): UserResponse! @join__field(graph: USER_SERVICE)
 }
 
 """Input for partially updating a blog post"""
