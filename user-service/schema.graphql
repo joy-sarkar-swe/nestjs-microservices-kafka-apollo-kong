@@ -25,18 +25,32 @@ type FieldError {
 
 type Query {
   """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
-  getUsers: ApiResponse!
+  getUsers: UsersResponse!
 
   """
   Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
   """
-  getUser(id: String!): ApiResponse!
+  getUser(id: String!): UserResponse!
+}
+
+"""Returns UsersSuccessResponse or ErrorResponse"""
+union UsersResponse = UsersSuccessResponse | ErrorResponse
+
+"""Success response wrapping a list of User entities"""
+type UsersSuccessResponse {
+  statusCode: Int!
+  success: Boolean!
+  message: String!
+
+  """The resolved User list"""
+  data: [User!]!
+  timestamp: DateTime!
 }
 
 """
-Union of all possible GraphQL operation outcomes. Use __typename to discriminate in client queries.
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
 """
-union ApiResponse = ErrorResponse | BaseResponse | UserSuccessResponse | UsersSuccessResponse
+scalar DateTime
 
 """Returned when an operation fails for any reason"""
 type ErrorResponse {
@@ -56,25 +70,8 @@ type ErrorResponse {
   timestamp: DateTime!
 }
 
-"""
-A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
-"""
-scalar DateTime
-
-"""Generic success confirmation without a data payload"""
-type BaseResponse {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
-  """Always true for success responses"""
-  success: Boolean!
-
-  """Human-readable success message"""
-  message: String!
-
-  """Server-side response timestamp"""
-  timestamp: DateTime!
-}
+"""Returns UserSuccessResponse or ErrorResponse"""
+union UserResponse = UserSuccessResponse | ErrorResponse
 
 """Success response wrapping a single User entity"""
 type UserSuccessResponse {
@@ -94,26 +91,15 @@ type UserSuccessResponse {
   timestamp: DateTime!
 }
 
-"""Success response wrapping a list of User entities"""
-type UsersSuccessResponse {
-  statusCode: Int!
-  success: Boolean!
-  message: String!
-
-  """The resolved User list"""
-  data: [User!]!
-  timestamp: DateTime!
-}
-
 type Mutation {
   """Create a new user. Emits user.created Kafka event on success."""
-  createUser(input: CreateUserInput!): ApiResponse!
+  createUser(input: CreateUserInput!): UserResponse!
 
   """Partially update an existing user. Emits user.updated Kafka event."""
-  updateUser(input: UpdateUserInput!): ApiResponse!
+  updateUser(input: UpdateUserInput!): UserResponse!
 
   """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
-  deleteUser(input: DeleteUserInput!): ApiResponse!
+  deleteUser(input: DeleteUserInput!): BaseApiResponse!
 }
 
 """Input for creating a new user"""
@@ -135,6 +121,24 @@ input UpdateUserInput {
 
   """New email address"""
   email: String
+}
+
+"""Returns BaseResponse or ErrorResponse"""
+union BaseApiResponse = BaseResponse | ErrorResponse
+
+"""Generic success confirmation without a data payload"""
+type BaseResponse {
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
 }
 
 """Input for deleting a user"""

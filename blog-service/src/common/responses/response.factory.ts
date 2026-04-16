@@ -3,7 +3,6 @@ import { ErrorResponse, BaseResponse } from './base-responses.type';
 import { BlogSuccessResponse, BlogsSuccessResponse } from './blog-success-response.type';
 import { FieldError } from './field-error.type';
 import { Blog } from '../../blogs/entities/blog.entity';
-import { ApiResponseType } from './api-response.union';
 
 /**
  * @factory ResponseFactory  (blog-service)
@@ -121,7 +120,7 @@ export class ResponseFactory {
    * Converts any caught exception into the correct ApiResponse variant.
    * Resolvers use try/catch and call this instead of rethrowing.
    */
-  static fromException(error: any): ApiResponseType {
+  static fromException(error: any): ErrorResponse {
     const status: number = error?.status ?? error?.statusCode ?? 500;
     const message: string = error?.message ?? 'An unexpected error occurred';
     switch (status) {

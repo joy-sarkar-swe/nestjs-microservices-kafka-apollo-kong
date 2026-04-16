@@ -4,7 +4,6 @@ import { BaseResponse } from './base-response.type';
 import { UserSuccessResponse, UsersSuccessResponse } from './user-success-response.type';
 import { FieldError } from './field-error.type';
 import { User } from '../../users/entities/user.entity';
-import { ApiResponseType } from './api-response.union';
 
 /**
  * @factory ResponseFactory
@@ -190,7 +189,7 @@ export class ResponseFactory {
    *
    * @param error - Any caught exception (typed as any for flexibility).
    */
-  static fromException(error: any): ApiResponseType {
+  static fromException(error: any): ErrorResponse {
     const status: number = error?.status ?? error?.statusCode ?? 500;
     const message: string = error?.message ?? 'An unexpected error occurred';
 

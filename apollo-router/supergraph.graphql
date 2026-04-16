@@ -20,21 +20,15 @@ directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on
 
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
 
-"""
-Union of all possible blog-service operation outcomes. Use __typename to discriminate in client queries.
-"""
-union ApiResponse
+"""Returns BaseResponse or ErrorResponse"""
+union BaseApiResponse
   @join__type(graph: BLOG_SERVICE)
   @join__type(graph: USER_SERVICE)
-  @join__unionMember(graph: BLOG_SERVICE, member: "ErrorResponse")
-  @join__unionMember(graph: USER_SERVICE, member: "ErrorResponse")
   @join__unionMember(graph: BLOG_SERVICE, member: "BaseResponse")
   @join__unionMember(graph: USER_SERVICE, member: "BaseResponse")
-  @join__unionMember(graph: BLOG_SERVICE, member: "BlogSuccessResponse")
-  @join__unionMember(graph: BLOG_SERVICE, member: "BlogsSuccessResponse")
-  @join__unionMember(graph: USER_SERVICE, member: "UserSuccessResponse")
-  @join__unionMember(graph: USER_SERVICE, member: "UsersSuccessResponse")
- = ErrorResponse | BaseResponse | BlogSuccessResponse | BlogsSuccessResponse | UserSuccessResponse | UsersSuccessResponse
+  @join__unionMember(graph: BLOG_SERVICE, member: "ErrorResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "ErrorResponse")
+ = BaseResponse | ErrorResponse
 
 """Generic success confirmation without a data payload"""
 type BaseResponse
@@ -73,6 +67,20 @@ type Blog
   """Author resolved from user-service via Apollo Federation"""
   author: User
 }
+
+"""Returns BlogSuccessResponse or ErrorResponse"""
+union BlogResponse
+  @join__type(graph: BLOG_SERVICE)
+  @join__unionMember(graph: BLOG_SERVICE, member: "BlogSuccessResponse")
+  @join__unionMember(graph: BLOG_SERVICE, member: "ErrorResponse")
+ = BlogSuccessResponse | ErrorResponse
+
+"""Returns BlogsSuccessResponse or ErrorResponse"""
+union BlogsResponse
+  @join__type(graph: BLOG_SERVICE)
+  @join__unionMember(graph: BLOG_SERVICE, member: "BlogsSuccessResponse")
+  @join__unionMember(graph: BLOG_SERVICE, member: "ErrorResponse")
+ = BlogsSuccessResponse | ErrorResponse
 
 """Success response wrapping a list of Blog entities"""
 type BlogsSuccessResponse
@@ -214,22 +222,22 @@ type Mutation
   @join__type(graph: USER_SERVICE)
 {
   """Create a new blog post. Emits blog.created Kafka event on success."""
-  createBlog(input: CreateBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+  createBlog(input: CreateBlogInput!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
   """Partially update a blog post. Emits blog.updated Kafka event."""
-  updateBlog(input: UpdateBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+  updateBlog(input: UpdateBlogInput!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
   """Delete a blog post. Emits blog.deleted Kafka event."""
-  deleteBlog(input: DeleteBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+  deleteBlog(input: DeleteBlogInput!): BaseApiResponse! @join__field(graph: BLOG_SERVICE)
 
   """Create a new user. Emits user.created Kafka event on success."""
-  createUser(input: CreateUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+  createUser(input: CreateUserInput!): UserResponse! @join__field(graph: USER_SERVICE)
 
   """Partially update an existing user. Emits user.updated Kafka event."""
-  updateUser(input: UpdateUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+  updateUser(input: UpdateUserInput!): UserResponse! @join__field(graph: USER_SERVICE)
 
   """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
-  deleteUser(input: DeleteUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+  deleteUser(input: DeleteUserInput!): BaseApiResponse! @join__field(graph: USER_SERVICE)
 }
 
 type Query
@@ -237,20 +245,20 @@ type Query
   @join__type(graph: USER_SERVICE)
 {
   """Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."""
-  getBlogs: ApiResponse! @join__field(graph: BLOG_SERVICE)
+  getBlogs: BlogsResponse! @join__field(graph: BLOG_SERVICE)
 
   """
   Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
   """
-  getBlog(id: String!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+  getBlog(id: String!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
   """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
-  getUsers: ApiResponse! @join__field(graph: USER_SERVICE)
+  getUsers: UsersResponse! @join__field(graph: USER_SERVICE)
 
   """
   Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
   """
-  getUser(id: String!): ApiResponse! @join__field(graph: USER_SERVICE)
+  getUser(id: String!): UserResponse! @join__field(graph: USER_SERVICE)
 }
 
 """Input for partially updating a blog post"""
@@ -295,6 +303,20 @@ type User
   """Unique email address"""
   email: String! @join__field(graph: USER_SERVICE)
 }
+
+"""Returns UserSuccessResponse or ErrorResponse"""
+union UserResponse
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "UserSuccessResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "ErrorResponse")
+ = UserSuccessResponse | ErrorResponse
+
+"""Returns UsersSuccessResponse or ErrorResponse"""
+union UsersResponse
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: USER_SERVICE, member: "UsersSuccessResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "ErrorResponse")
+ = UsersSuccessResponse | ErrorResponse
 
 """Success response wrapping a list of User entities"""
 type UsersSuccessResponse

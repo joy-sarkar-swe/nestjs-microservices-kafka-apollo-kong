@@ -37,18 +37,32 @@ type FieldError {
 
 type Query {
   """Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."""
-  getBlogs: ApiResponse!
+  getBlogs: BlogsResponse!
 
   """
   Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
   """
-  getBlog(id: String!): ApiResponse!
+  getBlog(id: String!): BlogResponse!
+}
+
+"""Returns BlogsSuccessResponse or ErrorResponse"""
+union BlogsResponse = BlogsSuccessResponse | ErrorResponse
+
+"""Success response wrapping a list of Blog entities"""
+type BlogsSuccessResponse {
+  statusCode: Int!
+  success: Boolean!
+  message: String!
+
+  """The resolved Blog list"""
+  data: [Blog!]!
+  timestamp: DateTime!
 }
 
 """
-Union of all possible blog-service operation outcomes. Use __typename to discriminate in client queries.
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
 """
-union ApiResponse = ErrorResponse | BaseResponse | BlogSuccessResponse | BlogsSuccessResponse
+scalar DateTime
 
 """Returned when a blog-service operation fails"""
 type ErrorResponse {
@@ -68,25 +82,8 @@ type ErrorResponse {
   timestamp: DateTime!
 }
 
-"""
-A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
-"""
-scalar DateTime
-
-"""Generic success confirmation without a data payload"""
-type BaseResponse {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
-  """Always true for success responses"""
-  success: Boolean!
-
-  """Human-readable success message"""
-  message: String!
-
-  """Server-side response timestamp"""
-  timestamp: DateTime!
-}
+"""Returns BlogSuccessResponse or ErrorResponse"""
+union BlogResponse = BlogSuccessResponse | ErrorResponse
 
 """Success response wrapping a single Blog entity"""
 type BlogSuccessResponse {
@@ -106,26 +103,15 @@ type BlogSuccessResponse {
   timestamp: DateTime!
 }
 
-"""Success response wrapping a list of Blog entities"""
-type BlogsSuccessResponse {
-  statusCode: Int!
-  success: Boolean!
-  message: String!
-
-  """The resolved Blog list"""
-  data: [Blog!]!
-  timestamp: DateTime!
-}
-
 type Mutation {
   """Create a new blog post. Emits blog.created Kafka event on success."""
-  createBlog(input: CreateBlogInput!): ApiResponse!
+  createBlog(input: CreateBlogInput!): BlogResponse!
 
   """Partially update a blog post. Emits blog.updated Kafka event."""
-  updateBlog(input: UpdateBlogInput!): ApiResponse!
+  updateBlog(input: UpdateBlogInput!): BlogResponse!
 
   """Delete a blog post. Emits blog.deleted Kafka event."""
-  deleteBlog(input: DeleteBlogInput!): ApiResponse!
+  deleteBlog(input: DeleteBlogInput!): BaseApiResponse!
 }
 
 """Input for creating a new blog post"""
@@ -150,6 +136,24 @@ input UpdateBlogInput {
 
   """New body text"""
   content: String
+}
+
+"""Returns BaseResponse or ErrorResponse"""
+union BaseApiResponse = BaseResponse | ErrorResponse
+
+"""Generic success confirmation without a data payload"""
+type BaseResponse {
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
 }
 
 """Input for deleting a blog post"""
