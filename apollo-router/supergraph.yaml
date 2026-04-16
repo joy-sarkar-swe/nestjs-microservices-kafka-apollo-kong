@@ -2,40 +2,30 @@
 # Apollo Router — Supergraph Composition Config
 # =============================================================================
 #
-# Used by the Rover CLI to compose the supergraph SDL from both running subgraphs.
-#
-# HOW IT WORKS
-# ─────────────
-# `rover supergraph compose` introspects each subgraph URL listed below,
-# fetches their SDL (schema definition language), and merges them into a
-# single supergraph.graphql file that Apollo Router uses to plan queries.
+# Used by Rover CLI to compose the supergraph SDL from both subgraphs.
 #
 # PREREQUISITES
 # ─────────────
-# • user-service must be running on :3001
-# • blog-service must be running on :3002
+# • user-service running on :3001
+# • blog-service  running on :3002
 # • Rover CLI installed: npm install -g @apollo/rover
 #
 # USAGE
 # ─────
 # cd apollo-router
 # rover supergraph compose --config supergraph.yaml > supergraph.graphql
+#
+# Re-run whenever a subgraph schema changes.
 # =============================================================================
 
 federation_version: =2.9.0
 
 subgraphs:
-  # ── user-service subgraph ──────────────────────────────────────────────────
-  # Owns: User entity (id, name, email)
-  # Kafka topics emitted: user.created, user.updated, user.deleted
   user-service:
     routing_url: http://localhost:3001/graphql
     schema:
       subgraph_url: http://localhost:3001/graphql
 
-  # ── blog-service subgraph ──────────────────────────────────────────────────
-  # Owns: Blog entity (id, title, content, authorId, author → User reference)
-  # Kafka topics emitted: blog.created, blog.updated, blog.deleted
   blog-service:
     routing_url: http://localhost:3002/graphql
     schema:

@@ -4,6 +4,8 @@ import {
   ApolloFederationDriver,
   ApolloFederationDriverConfig,
 } from '@nestjs/apollo';
+import { DateTimeResolver } from 'graphql-scalars';
+import { GraphQLScalarType } from 'graphql';
 import { UsersModule } from './users/users.module';
 
 /**
@@ -11,29 +13,55 @@ import { UsersModule } from './users/users.module';
  * @description Root module for user-service.
  *
  * GraphQL configuration
- * ---------------------
- * Uses ApolloFederationDriver (code-first) so NestJS generates the subgraph
- * SDL at runtime.  Apollo Router introspects this SDL at startup to compose
- * the supergraph.
+ * ─────────────────────
+ * Driver:         ApolloFederationDriver (code-first, Federation v2)
+ * autoSchemaFile: true — schema generated from TS decorators at runtime.
+ *                 When set to a file path (e.g. './schema.graphql'), NestJS
+ *                 writes the SDL to disk — enabling GraphQL Code Generator,
+ *                 CI schema linting, and schema diffing in CI pipelines.
+ *                 Set to 'schema.graphql' for production; `true` for demos.
  *
- * REST configuration
- * ------------------
- * REST routes are registered inside UsersModule via @nestjs/common controllers.
- * No extra configuration is needed here — NestJS HTTP adapter handles routing.
+ * DateTime scalar
+ * ───────────────
+ * Registered via the `resolvers` option. graphql-scalars provides a
+ * Federation-compatible DateTime scalar with RFC 3339 wire format.
+ * Must be registered here AND exported via @Scalar or the resolvers map.
+ *
+ * Apollo Router compatibility
+ * ───────────────────────────
+ * The ApolloFederationDriver serves the SDL at GET /_service so Apollo
+ * Router can introspect it at startup without any extra configuration.
  */
 @Module({
   imports: [
-    // ── GraphQL Federation subgraph ────────────────────────────────────────
     GraphQLModule.forRoot<ApolloFederationDriverConfig>({
       driver: ApolloFederationDriver,
-      // code-first: schema generated from TypeScript decorators
-      autoSchemaFile: { federation: 2 },
-      // Enable playground for direct subgraph testing
+
+      // ── Schema generation ────────────────────────────────────────────────
+      // Change to './schema.graphql' to write the SDL to disk.
+      // The generated file is what you commit for GraphQL Code Generator.
+      autoSchemaFile: {
+        federation: 2,
+        // path: './schema.graphql',   // ← uncomment to persist to disk
+      },
+
+      // ── Scalar registration ──────────────────────────────────────────────
+      // Maps the 'DateTime' scalar name (used in @Field decorators) to the
+      // graphql-scalars implementation that handles serialisation/parsing.
+      resolvers: {
+        DateTime: DateTimeResolver as unknown as GraphQLScalarType,
+      },
+
+      // ── Dev tooling ──────────────────────────────────────────────────────
       playground: true,
       introspection: true,
+
+      // ── Context forwarding ───────────────────────────────────────────────
+      // Expose the raw HTTP request in the GraphQL context so filters and
+      // guards can access headers (e.g. correlation ID, auth tokens).
+      context: ({ req }: { req: Request }) => ({ req }),
     }),
 
-    // ── Feature modules ────────────────────────────────────────────────────
     UsersModule,
   ],
 })

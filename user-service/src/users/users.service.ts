@@ -13,29 +13,27 @@ import { CreateUserInput, UpdateUserInput, DeleteUserInput } from './dto/user.in
  * @service UsersService
  * @description Core business logic for user CRUD.
  *
- * Storage
- * -------
- * Uses an in-memory `Map<id, User>` — no database required for this demo.
- * State is lost on restart, which is acceptable for lecture purposes.
+ * Responsibility boundary
+ * -----------------------
+ * This service operates on plain domain objects (User).
+ * It throws NestJS HTTP exceptions (NotFoundException, ConflictException)
+ * on failure — it does NOT construct ApiResponse objects.
+ * Response wrapping is the resolver's responsibility via ResponseFactory.
  *
- * Kafka integration
- * -----------------
- * After every mutation the service **emits** (fire-and-forget) a domain event
- * so other services (e.g. blog-service cleaning up orphaned posts) can react
- * asynchronously without tight coupling.
+ * This separation keeps the service layer:
+ *   • Testable independently of GraphQL
+ *   • Reusable from REST controllers
+ *   • Free of presentation-layer concerns
  *
- * Topics emitted
- * ├─ user.created  — full User payload
- * ├─ user.updated  — full User payload
- * └─ user.deleted  — { id } payload
+ * Storage:  in-memory Map<UUID, User>
+ * Events:   Kafka producer — user.created | user.updated | user.deleted
  */
 @Injectable()
 export class UsersService implements OnModuleInit {
   /**
    * @property kafkaClient
-   * Inline Kafka **producer** client owned by this service.
-   * Using @Client() decorator keeps the producer configuration co-located
-   * with the service that needs it (vs a separate module-level registration).
+   * Inline Kafka producer client.
+   * allowAutoTopicCreation avoids manual topic pre-creation in dev.
    */
   @Client({
     transport: Transport.KAFKA,
@@ -56,17 +54,16 @@ export class UsersService implements OnModuleInit {
 
   /**
    * @lifecycle onModuleInit
-   * Connect the Kafka producer before any mutations are handled.
-   * NestJS guarantees this runs before the first request reaches controllers.
+   * Connect the Kafka producer before the first request arrives.
    */
   async onModuleInit(): Promise<void> {
     await this.kafkaClient.connect();
   }
 
-  // ── READ ─────────────────────────────────────────────────────────────────
+  // ── READ ──────────────────────────────────────────────────────────────────
 
   /**
-   * Returns every user currently in the store.
+   * Returns all users.
    * @returns {User[]} Possibly empty array.
    */
   findAll(): User[] {
@@ -75,12 +72,12 @@ export class UsersService implements OnModuleInit {
 
   /**
    * Returns a single user by UUID.
-   * @throws {NotFoundException} When the id is not found.
+   * @throws {NotFoundException} 404 when id is not found.
    */
   findOne(id: string): User {
     const user = this.users.get(id);
     if (!user) {
-      throw new NotFoundException(`User "${id}" not found`);
+      throw new NotFoundException(`User with id "${id}" was not found`);
     }
     return user;
   }
@@ -90,21 +87,18 @@ export class UsersService implements OnModuleInit {
   /**
    * Creates a new user and emits `user.created` on Kafka.
    *
-   * @throws {ConflictException} If the email is already registered.
+   * @throws {ConflictException} 409 when email is already registered.
    *
-   * Flow
-   * 1. Guard: check email uniqueness
-   * 2. Build record with uuid()
-   * 3. Persist to Map
-   * 4. Emit `user.created`
-   * 5. Return the record
+   * Flow: guard → build → persist → emit → return
    */
   async create(input: CreateUserInput): Promise<User> {
     const emailExists = Array.from(this.users.values()).some(
       (u) => u.email === input.email,
     );
     if (emailExists) {
-      throw new ConflictException(`Email "${input.email}" is already registered`);
+      throw new ConflictException(
+        `Email "${input.email}" is already registered`,
+      );
     }
 
     const user: User = {
@@ -114,35 +108,31 @@ export class UsersService implements OnModuleInit {
     };
 
     this.users.set(user.id, user);
-    this.emit('user.created', user);
+    this.publish('user.created', user);
     return user;
   }
 
   // ── UPDATE ────────────────────────────────────────────────────────────────
 
   /**
-   * Partially updates an existing user and emits `user.updated` on Kafka.
+   * Partially updates a user and emits `user.updated` on Kafka.
    *
-   * @throws {NotFoundException}  Unknown id.
-   * @throws {ConflictException}  New email already taken by another user.
+   * @throws {NotFoundException}  404 when id is not found.
+   * @throws {ConflictException}  409 when new email is already taken.
    *
-   * Flow
-   * 1. Resolve existing record
-   * 2. Guard: email uniqueness if email changed
-   * 3. Merge changed fields (undefined fields left untouched)
-   * 4. Persist updated record
-   * 5. Emit `user.updated`
-   * 6. Return updated record
+   * Flow: resolve → guard → merge → persist → emit → return
    */
   async update(input: UpdateUserInput): Promise<User> {
-    const existing = this.findOne(input.id);
+    const existing = this.findOne(input.id); // throws 404
 
     if (input.email && input.email !== existing.email) {
-      const taken = Array.from(this.users.values()).some(
+      const emailTaken = Array.from(this.users.values()).some(
         (u) => u.email === input.email && u.id !== input.id,
       );
-      if (taken) {
-        throw new ConflictException(`Email "${input.email}" is already registered`);
+      if (emailTaken) {
+        throw new ConflictException(
+          `Email "${input.email}" is already registered`,
+        );
       }
     }
 
@@ -153,7 +143,7 @@ export class UsersService implements OnModuleInit {
     };
 
     this.users.set(updated.id, updated);
-    this.emit('user.updated', updated);
+    this.publish('user.updated', updated);
     return updated;
   }
 
@@ -163,40 +153,39 @@ export class UsersService implements OnModuleInit {
    * Removes a user and emits `user.deleted` on Kafka.
    * blog-service listens to `user.deleted` and removes orphaned posts.
    *
-   * @throws {NotFoundException} Unknown id.
-   * @returns {boolean} Always `true` on success.
+   * @throws {NotFoundException} 404 when id is not found.
    */
-  async delete(input: DeleteUserInput): Promise<boolean> {
-    this.findOne(input.id); // throws if not found
+  async delete(input: DeleteUserInput): Promise<void> {
+    this.findOne(input.id); // throws 404
     this.users.delete(input.id);
-    this.emit('user.deleted', { id: input.id });
-    return true;
+    this.publish('user.deleted', { id: input.id });
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
   /**
    * Apollo Federation entity resolver.
-   * Apollo Router calls this when another subgraph returns a `User { id }`
-   * reference and the query requests additional User fields.
+   * Called by Apollo Router when blog-service returns a User { id } reference
+   * and the client requests additional User fields.
    *
-   * @param {{ id: string }} reference - The partial entity from the Router.
+   * @param {{ id: string }} reference - Minimal entity reference from Router.
    * @returns {User} Fully populated User record.
+   * @throws {NotFoundException} If the referenced user no longer exists.
    */
   resolveReference(reference: { id: string }): User {
     return this.findOne(reference.id);
   }
 
-  // ── HELPERS ───────────────────────────────────────────────────────────────
+  // ── KAFKA ─────────────────────────────────────────────────────────────────
 
   /**
-   * Fire-and-forget Kafka emit helper.
-   * Sets a string key equal to the entity id so Kafka partitions consistently.
+   * Fire-and-forget Kafka event emission.
+   * Uses entity id as the message key for consistent partition routing.
    */
-  private emit(topic: string, payload: object): void {
-    const id = (payload as any).id ?? 'unknown';
+  private publish(topic: string, payload: object): void {
+    const key = (payload as any).id ?? 'unknown';
     this.kafkaClient.emit(topic, {
-      key: id,
+      key,
       value: JSON.stringify(payload),
     });
   }

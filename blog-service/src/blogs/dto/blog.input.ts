@@ -1,74 +1,77 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsNotEmpty, IsString, IsUUID, IsOptional } from 'class-validator';
+import {
+  IsNotEmpty, IsString, IsUUID, IsOptional,
+  MinLength, MaxLength,
+} from 'class-validator';
 
 /**
  * @dto CreateBlogInput
- * @description Input for creating a new blog post.
- *   Shared between the GraphQL mutation (@Args) and the REST POST /blogs
- *   endpoint (@Body) — class-validator runs in both paths via the global
- *   ValidationPipe configured in main.ts.
+ * Validated by class-validator via the global ValidationPipe.
+ * On failure, GqlValidationFilter converts violations to ErrorResponse.
+ *
+ * GraphQL schema:
+ *   input CreateBlogInput { title: String!  content: String!  authorId: ID! }
  */
-@InputType()
+@InputType({ description: 'Input for creating a new blog post' })
 export class CreateBlogInput {
-  /** Post headline — required, non-empty. */
-  @Field()
+  @Field(() => String, { description: 'Post headline (2–200 characters)' })
   @IsNotEmpty({ message: 'title must not be empty' })
-  @IsString()
+  @IsString({ message: 'title must be a string' })
+  @MinLength(2, { message: 'title must be at least 2 characters' })
+  @MaxLength(200, { message: 'title must be at most 200 characters' })
   title: string;
 
-  /** Post body text — required, non-empty. */
-  @Field()
+  @Field(() => String, { description: 'Post body text (min 10 characters)' })
   @IsNotEmpty({ message: 'content must not be empty' })
-  @IsString()
+  @IsString({ message: 'content must be a string' })
+  @MinLength(10, { message: 'content must be at least 10 characters' })
   content: string;
 
   /**
-   * UUID of the existing user who is authoring this post.
-   * blog-service stores this as a plain id (no FK constraint — in-memory store).
-   * Apollo Router resolves the full User object from user-service at query time.
+   * UUID of the author in user-service.
+   * blog-service stores this raw — no FK constraint (in-memory store).
+   * Apollo Router resolves full User fields from user-service at query time.
    */
-  @Field(() => ID)
+  @Field(() => ID, { description: 'UUID of the author (must exist in user-service)' })
   @IsUUID('4', { message: 'authorId must be a valid UUID v4' })
   authorId: string;
 }
 
 /**
  * @dto UpdateBlogInput
- * @description Input for partially updating an existing blog post.
- *   `id` is always required; `title` and `content` are optional.
+ * Only title and content are updatable. authorId is immutable after creation.
  *
- * Used by GraphQL mutation — for REST, `id` comes from the URL param
- * and is merged into this shape inside the controller.
+ * GraphQL schema:
+ *   input UpdateBlogInput { id: ID!  title: String  content: String }
  */
-@InputType()
+@InputType({ description: 'Input for partially updating a blog post' })
 export class UpdateBlogInput {
-  /** UUID of the blog post to update. */
-  @Field(() => ID)
+  @Field(() => ID, { description: 'UUID of the blog post to update' })
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 
-  /** Optional new title. */
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true, description: 'New headline' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'title must be a string' })
+  @MinLength(2, { message: 'title must be at least 2 characters' })
+  @MaxLength(200, { message: 'title must be at most 200 characters' })
   title?: string;
 
-  /** Optional new body content. */
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true, description: 'New body text' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'content must be a string' })
+  @MinLength(10, { message: 'content must be at least 10 characters' })
   content?: string;
 }
 
 /**
  * @dto DeleteBlogInput
- * @description Minimal payload to identify the blog post to remove.
- *   Used by the GraphQL mutation only; REST uses a URL param.
+ * GraphQL schema:
+ *   input DeleteBlogInput { id: ID! }
  */
-@InputType()
+@InputType({ description: 'Input for deleting a blog post' })
 export class DeleteBlogInput {
-  /** UUID of the blog post to delete. */
-  @Field(() => ID)
+  @Field(() => ID, { description: 'UUID of the blog post to delete' })
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 }

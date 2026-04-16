@@ -4,21 +4,19 @@ import { BlogsService } from './blogs.service';
 
 /**
  * @controller BlogsKafkaController
- * @description Kafka consumer for the blog-service.
+ * @description Kafka consumer for blog-service.
  *
  * Consumer group: blog-service-group
- *
- * Each Kafka consumer group gets its own copy of every message.
- * Both user-service and blog-service can subscribe to `user.created` and
- * each receives the message independently — no competition between groups.
+ * Each group gets its own independent copy of every message,
+ * so user-service and blog-service both consume user.* events independently.
  *
  * Topics subscribed
- * ├─ user.created  — cross-service: log for observability
- * ├─ user.updated  — cross-service: log (extend for denorm cache update)
- * ├─ user.deleted  — cross-service: ⚡ triggers orphan blog cleanup
- * ├─ blog.created  — self: observability / analytics hook
- * ├─ blog.updated  — self: observability / search-index update hook
- * └─ blog.deleted  — self: observability / CDN purge hook
+ * ├─ user.created  — cross-service: observability
+ * ├─ user.updated  — cross-service: observability / denorm cache
+ * ├─ user.deleted  — cross-service: ⚡ orphan blog cleanup
+ * ├─ blog.created  — self: observability / search index hook
+ * ├─ blog.updated  — self: observability / CDN purge hook
+ * └─ blog.deleted  — self: observability / cleanup hook
  */
 @Controller()
 export class BlogsKafkaController {
@@ -28,67 +26,37 @@ export class BlogsKafkaController {
 
   // ── USER EVENTS (cross-service) ───────────────────────────────────────────
 
-  /**
-   * @handler handleUserCreated
-   * Receives `user.created` from user-service.
-   * Logs for observability; extend to pre-warm caches or update denorm data.
-   */
   @EventPattern('user.created')
-  handleUserCreated(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): void {
-    const data = this.parsePayload(payload);
-    this.logger.log(
-      `[${context.getTopic()}] user.created received — id=${data?.id}`,
-    );
-    // Extend: pre-warm author name cache, notify analytics, etc.
+  handleUserCreated(@Payload() payload: any, @Ctx() context: KafkaContext): void {
+    const data = this.parse(payload);
+    this.logger.log(`[${context.getTopic()}] user.created — id=${data?.id}`);
   }
 
-  /**
-   * @handler handleUserUpdated
-   * Receives `user.updated` from user-service.
-   * In production: update any denormalised author name stored on cached blog objects.
-   */
   @EventPattern('user.updated')
-  handleUserUpdated(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): void {
-    const data = this.parsePayload(payload);
-    this.logger.log(
-      `[${context.getTopic()}] user.updated received — id=${data?.id}`,
-    );
-    // Extend: refresh author display name on cached blog summaries, etc.
+  handleUserUpdated(@Payload() payload: any, @Ctx() context: KafkaContext): void {
+    const data = this.parse(payload);
+    this.logger.log(`[${context.getTopic()}] user.updated — id=${data?.id}`);
   }
 
   /**
    * @handler handleUserDeleted
-   * Receives `user.deleted` from user-service.
+   * ⚡ Critical cross-service handler.
    *
-   * ⚡ This is the critical cross-service handler.
-   * Delegates to BlogsService.handleUserDeleted() which:
-   *   1. Finds all Blog posts where authorId === deleted userId
+   * When user-service deletes a user, it emits user.deleted.
+   * This handler delegates to BlogsService.handleUserDeleted() which:
+   *   1. Finds all blogs where authorId === deletedUserId
    *   2. Removes them from the in-memory store
-   *   3. Emits a `blog.deleted` event for each removed post
+   *   3. Emits blog.deleted for each removed post
    *
-   * This implements referential integrity via async events — the microservice
-   * equivalent of a database ON DELETE CASCADE foreign key constraint.
-   *
-   * @param payload - Expected shape: { id: string } or stringified JSON of same.
+   * This is microservice-native referential integrity via event streaming —
+   * equivalent to a database ON DELETE CASCADE foreign key, but async and
+   * decoupled across service boundaries.
    */
   @EventPattern('user.deleted')
-  async handleUserDeleted(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): Promise<void> {
-    const data = this.parsePayload(payload);
+  async handleUserDeleted(@Payload() payload: any, @Ctx() context: KafkaContext): Promise<void> {
+    const data = this.parse(payload);
     const userId = data?.id;
-
-    this.logger.warn(
-      `[${context.getTopic()}] user.deleted received — removing blogs for user ${userId}`,
-    );
-
+    this.logger.warn(`[${context.getTopic()}] user.deleted — removing blogs for user ${userId}`);
     if (userId) {
       await this.blogsService.handleUserDeleted(userId);
     }
@@ -96,63 +64,31 @@ export class BlogsKafkaController {
 
   // ── BLOG EVENTS (self — observability) ────────────────────────────────────
 
-  /**
-   * @handler handleBlogCreated
-   * Observes own `blog.created` events.
-   * Extend: index in Elasticsearch, push to real-time feed, etc.
-   */
   @EventPattern('blog.created')
-  handleBlogCreated(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): void {
-    const data = this.parsePayload(payload);
-    this.logger.log(
-      `[${context.getTopic()}] blog.created — id=${data?.id}  title="${data?.title}"`,
-    );
+  handleBlogCreated(@Payload() payload: any, @Ctx() context: KafkaContext): void {
+    const data = this.parse(payload);
+    this.logger.log(`[${context.getTopic()}] blog.created — id=${data?.id} title="${data?.title}"`);
+    // Extend: update search index, push to real-time feed, etc.
   }
 
-  /**
-   * @handler handleBlogUpdated
-   * Observes own `blog.updated` events.
-   * Extend: update search index entry, clear CDN cache, etc.
-   */
   @EventPattern('blog.updated')
-  handleBlogUpdated(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): void {
-    const data = this.parsePayload(payload);
-    this.logger.log(
-      `[${context.getTopic()}] blog.updated — id=${data?.id}`,
-    );
+  handleBlogUpdated(@Payload() payload: any, @Ctx() context: KafkaContext): void {
+    const data = this.parse(payload);
+    this.logger.log(`[${context.getTopic()}] blog.updated — id=${data?.id}`);
+    // Extend: update search index entry, clear CDN cache, etc.
   }
 
-  /**
-   * @handler handleBlogDeleted
-   * Observes own `blog.deleted` events (including orphan-cleanup ones).
-   * Extend: remove from search index, purge CDN, trigger notification, etc.
-   */
   @EventPattern('blog.deleted')
-  handleBlogDeleted(
-    @Payload() payload: any,
-    @Ctx() context: KafkaContext,
-  ): void {
-    const data = this.parsePayload(payload);
+  handleBlogDeleted(@Payload() payload: any, @Ctx() context: KafkaContext): void {
+    const data = this.parse(payload);
     const reason = data?.reason ? ` (reason: ${data.reason})` : '';
-    this.logger.log(
-      `[${context.getTopic()}] blog.deleted — id=${data?.id}${reason}`,
-    );
+    this.logger.log(`[${context.getTopic()}] blog.deleted — id=${data?.id}${reason}`);
+    // Extend: remove from search index, purge CDN, notify subscribers, etc.
   }
 
-  /** Safely parse Kafka message value (may arrive as string or object). */
-  private parsePayload(payload: any): any {
+  private parse(payload: any): any {
     if (typeof payload === 'string') {
-      try {
-        return JSON.parse(payload);
-      } catch {
-        return { raw: payload };
-      }
+      try { return JSON.parse(payload); } catch { return { raw: payload }; }
     }
     return payload;
   }

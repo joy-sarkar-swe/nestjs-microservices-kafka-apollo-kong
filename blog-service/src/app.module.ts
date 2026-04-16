@@ -4,32 +4,36 @@ import {
   ApolloFederationDriver,
   ApolloFederationDriverConfig,
 } from '@nestjs/apollo';
+import { DateTimeResolver } from 'graphql-scalars';
+import { GraphQLScalarType } from 'graphql';
 import { BlogsModule } from './blogs/blogs.module';
 
 /**
- * @module AppModule
- * @description Root module for blog-service.
+ * @module AppModule  (blog-service)
  *
- * GraphQL — ApolloFederationDriver (code-first, Federation v2)
- *   Apollo Router introspects /graphql at startup to compose the supergraph.
- *   The Blog entity is annotated with @key(fields: "id").
- *   The User entity stub is annotated with @extends @key(fields: "id") so
- *   the Router knows to resolve full User fields from user-service.
+ * GraphQL: ApolloFederationDriver, code-first, Federation v2.
+ *   autoSchemaFile generates the subgraph SDL at runtime.
+ *   Apollo Router introspects this SDL via GET /_service.
+ *   Set path: './schema.graphql' to persist SDL to disk for Code Generator.
  *
- * REST — registered via BlogsRestController inside BlogsModule.
- *   No extra config here; NestJS HTTP adapter handles routing automatically.
+ * DateTime scalar: registered via graphql-scalars DateTimeResolver.
+ *   Required for all timestamp fields in the response system.
  */
 @Module({
   imports: [
-    // ── GraphQL Federation subgraph ────────────────────────────────────────
     GraphQLModule.forRoot<ApolloFederationDriverConfig>({
       driver: ApolloFederationDriver,
-      autoSchemaFile: { federation: 2 },
+      autoSchemaFile: {
+        federation: 2,
+        // path: './schema.graphql',  // uncomment to write SDL to disk
+      },
+      resolvers: {
+        DateTime: DateTimeResolver as unknown as GraphQLScalarType,
+      },
       playground: true,
       introspection: true,
+      context: ({ req }: { req: Request }) => ({ req }),
     }),
-
-    // ── Feature module ─────────────────────────────────────────────────────
     BlogsModule,
   ],
 })

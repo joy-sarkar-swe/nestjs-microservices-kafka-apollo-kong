@@ -1,61 +1,98 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsEmail, IsNotEmpty, IsString, IsUUID, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  IsOptional,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 /**
  * @dto CreateUserInput
  * @description Payload for creating a new user.
- *   Used by both the GraphQL mutation and the REST POST /users endpoint.
- *   class-validator decorators enforce correctness at the transport boundary.
+ *
+ * Validated by class-validator via the global ValidationPipe.
+ * On failure, GqlValidationFilter converts violations to ErrorResponse.
+ *
+ * GraphQL schema:
+ *   input CreateUserInput {
+ *     name:  String!
+ *     email: String!
+ *   }
  */
-@InputType()
+@InputType({ description: 'Input for creating a new user' })
 export class CreateUserInput {
-  /** Full display name — required, non-empty string. */
-  @Field()
+  /**
+   * Full display name.
+   * Min 2 characters, max 100 characters.
+   */
+  @Field(() => String, { description: 'Full display name (2–100 characters)' })
   @IsNotEmpty({ message: 'name must not be empty' })
-  @IsString()
+  @IsString({ message: 'name must be a string' })
+  @MinLength(2, { message: 'name must be at least 2 characters' })
+  @MaxLength(100, { message: 'name must be at most 100 characters' })
   name: string;
 
-  /** Email — required, valid RFC 5322 format. */
-  @Field()
-  @IsEmail({}, { message: 'email must be a valid address' })
+  /**
+   * Email address — must be valid RFC 5322 format.
+   * Uniqueness is enforced at the service layer.
+   */
+  @Field(() => String, { description: 'Valid email address' })
+  @IsEmail({}, { message: 'email must be a valid email address' })
   email: string;
 }
 
 /**
  * @dto UpdateUserInput
  * @description Payload for partially updating an existing user.
- *   `id` is always required; `name` and `email` are optional.
- *   Applies to both GraphQL mutation and REST PUT /users/:id.
+ *
+ * `id` is always required. `name` and `email` are optional —
+ * only provided fields are applied (patch semantics).
+ *
+ * GraphQL schema:
+ *   input UpdateUserInput {
+ *     id:    ID!
+ *     name:  String
+ *     email: String
+ *   }
  */
-@InputType()
+@InputType({ description: 'Input for partially updating a user' })
 export class UpdateUserInput {
   /** UUID of the user record to update. */
-  @Field(() => ID)
+  @Field(() => ID, { description: 'UUID of the user to update' })
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 
   /** Optional new display name. */
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true, description: 'New display name' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'name must be a string' })
+  @MinLength(2, { message: 'name must be at least 2 characters' })
+  @MaxLength(100, { message: 'name must be at most 100 characters' })
   name?: string;
 
   /** Optional new email address. */
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true, description: 'New email address' })
   @IsOptional()
-  @IsEmail({}, { message: 'email must be a valid address' })
+  @IsEmail({}, { message: 'email must be a valid email address' })
   email?: string;
 }
 
 /**
  * @dto DeleteUserInput
  * @description Minimal payload to identify the user to remove.
- *   Used by the GraphQL mutation only; REST uses a URL param.
+ *
+ * GraphQL schema:
+ *   input DeleteUserInput {
+ *     id: ID!
+ *   }
  */
-@InputType()
+@InputType({ description: 'Input for deleting a user' })
 export class DeleteUserInput {
   /** UUID of the user to delete. */
-  @Field(() => ID)
+  @Field(() => ID, { description: 'UUID of the user to delete' })
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 }

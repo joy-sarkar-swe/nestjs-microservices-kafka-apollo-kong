@@ -5,6 +5,7 @@ import {
   Args,
   ResolveReference,
 } from '@nestjs/graphql';
+import { HttpStatus } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import {
@@ -12,20 +13,40 @@ import {
   UpdateUserInput,
   DeleteUserInput,
 } from './dto/user.input';
+import { ApiResponse, ApiResponseType } from '../common/responses/api-response.union';
+import { ResponseFactory } from '../common/responses/response.factory';
 
 /**
  * @resolver UsersResolver
  * @description GraphQL resolver for the user-service Federation subgraph.
  *
- * Exposes:
- *   Queries    — getUsers, getUser
- *   Mutations  — createUser, updateUser, deleteUser
- *   Federation — @ResolveReference (entity resolver for cross-service joins)
+ * All queries and mutations return `ApiResponse` — the union of all
+ * possible response types.  Clients use `__typename` to discriminate:
  *
- * Apollo Router routes field-level requests to this subgraph based on the
- * composed supergraph SDL.  When blog-service returns `author { id }`, the
- * Router recognises `User` as a federated entity owned here and dispatches
- * an entity-resolution sub-request.
+ *   mutation {
+ *     createUser(input: { name: "Alice", email: "alice@example.com" }) {
+ *       __typename
+ *       ... on UserSuccessResponse  { statusCode success message data { id name email } timestamp }
+ *       ... on ErrorResponse        { statusCode success message errors { field message } timestamp }
+ *     }
+ *   }
+ *
+ * Error handling strategy
+ * -----------------------
+ * Each resolver wraps the service call in try/catch.
+ * On success: ResponseFactory.user() / ResponseFactory.users() / ResponseFactory.deleted()
+ * On failure: ResponseFactory.fromException(error)
+ *
+ * Validation errors (BadRequestException from ValidationPipe) are caught
+ * by GqlValidationFilter BEFORE reaching the resolver — they return
+ * ErrorResponse directly without entering the try/catch here.
+ *
+ * Federation
+ * ----------
+ * @ResolveReference — Apollo Router calls this when blog-service returns a
+ * `User { id }` stub and the client requests User fields.
+ * This resolver returns the full User object (not wrapped in ApiResponse)
+ * because the Router handles entity stitching internally.
  */
 @Resolver(() => User)
 export class UsersResolver {
@@ -35,89 +56,195 @@ export class UsersResolver {
 
   /**
    * @query getUsers
-   * Returns all users.
+   * Returns all users wrapped in UsersSuccessResponse.
    *
    * @example
-   *   query { getUsers { id name email } }
+   *   query {
+   *     getUsers {
+   *       __typename
+   *       ... on UsersSuccessResponse {
+   *         statusCode success message timestamp
+   *         data { id name email }
+   *       }
+   *       ... on ErrorResponse { statusCode message }
+   *     }
+   *   }
    */
-  @Query(() => [User], { name: 'getUsers', description: 'Fetch all users' })
-  getUsers(): User[] {
-    return this.usersService.findAll();
+  @Query(() => ApiResponse, {
+    name: 'getUsers',
+    description: 'Fetch all users. Returns UsersSuccessResponse or ErrorResponse.',
+  })
+  async getUsers(): Promise<ApiResponseType> {
+    try {
+      const users = this.usersService.findAll();
+      return ResponseFactory.users(users, 'Users retrieved successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
    * @query getUser
-   * Returns a single user by UUID.
+   * Returns a single user by UUID wrapped in UserSuccessResponse.
    *
    * @param id - UUID of the requested user.
    *
    * @example
-   *   query { getUser(id: "…") { id name email } }
+   *   query {
+   *     getUser(id: "some-uuid") {
+   *       __typename
+   *       ... on UserSuccessResponse {
+   *         statusCode success message timestamp
+   *         data { id name email }
+   *       }
+   *       ... on ErrorResponse { statusCode message }
+   *     }
+   *   }
    */
-  @Query(() => User, { name: 'getUser', description: 'Fetch one user by id' })
-  getUser(@Args('id') id: string): User {
-    return this.usersService.findOne(id);
+  @Query(() => ApiResponse, {
+    name: 'getUser',
+    description: 'Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.',
+  })
+  async getUser(@Args('id', { type: () => String }) id: string): Promise<ApiResponseType> {
+    try {
+      const user = this.usersService.findOne(id);
+      return ResponseFactory.user(user, 'User retrieved successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   // ── MUTATIONS ─────────────────────────────────────────────────────────────
 
   /**
    * @mutation createUser
-   * Creates a new user.  Emits `user.created` Kafka event.
+   * Creates a new user. Returns UserSuccessResponse (201) or ErrorResponse.
+   *
+   * Possible outcomes:
+   *   UserSuccessResponse (201) — user created
+   *   ErrorResponse (400)       — validation failed (caught by GqlValidationFilter)
+   *   ErrorResponse (409)       — email already registered
+   *   ErrorResponse (500)       — unexpected server error
    *
    * @example
    *   mutation {
    *     createUser(input: { name: "Alice", email: "alice@example.com" }) {
-   *       id name email
+   *       __typename
+   *       ... on UserSuccessResponse {
+   *         statusCode success message timestamp
+   *         data { id name email }
+   *       }
+   *       ... on ErrorResponse {
+   *         statusCode success message timestamp
+   *         errors { field message }
+   *       }
    *     }
    *   }
    */
-  @Mutation(() => User, { description: 'Create a new user' })
-  createUser(@Args('input') input: CreateUserInput): Promise<User> {
-    return this.usersService.create(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Create a new user. Emits user.created Kafka event on success.',
+  })
+  async createUser(
+    @Args('input') input: CreateUserInput,
+  ): Promise<ApiResponseType> {
+    try {
+      const user = await this.usersService.create(input);
+      return ResponseFactory.user(user, 'User created successfully', HttpStatus.CREATED);
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
    * @mutation updateUser
-   * Partially updates an existing user.  Emits `user.updated` Kafka event.
+   * Partially updates an existing user. Returns UserSuccessResponse or ErrorResponse.
+   *
+   * Possible outcomes:
+   *   UserSuccessResponse (200) — user updated
+   *   ErrorResponse (400)       — validation failed
+   *   ErrorResponse (404)       — user not found
+   *   ErrorResponse (409)       — new email already taken
+   *   ErrorResponse (500)       — unexpected server error
    *
    * @example
    *   mutation {
-   *     updateUser(input: { id: "…", name: "Alice Updated" }) {
-   *       id name email
+   *     updateUser(input: { id: "some-uuid", name: "Alice Updated" }) {
+   *       __typename
+   *       ... on UserSuccessResponse {
+   *         statusCode message data { id name email } timestamp
+   *       }
+   *       ... on ErrorResponse { statusCode message errors { field message } timestamp }
    *     }
    *   }
    */
-  @Mutation(() => User, { description: 'Update an existing user' })
-  updateUser(@Args('input') input: UpdateUserInput): Promise<User> {
-    return this.usersService.update(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Partially update an existing user. Emits user.updated Kafka event.',
+  })
+  async updateUser(
+    @Args('input') input: UpdateUserInput,
+  ): Promise<ApiResponseType> {
+    try {
+      const user = await this.usersService.update(input);
+      return ResponseFactory.user(user, 'User updated successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
    * @mutation deleteUser
-   * Removes a user.  Emits `user.deleted` Kafka event — blog-service will
-   * clean up all posts authored by this user.
+   * Deletes a user. Returns BaseResponse or ErrorResponse.
+   * Emits user.deleted Kafka event → blog-service removes orphaned posts.
+   *
+   * Possible outcomes:
+   *   BaseResponse  (200) — user deleted
+   *   ErrorResponse (400) — validation failed
+   *   ErrorResponse (404) — user not found
+   *   ErrorResponse (500) — unexpected server error
    *
    * @example
-   *   mutation { deleteUser(input: { id: "…" }) }
+   *   mutation {
+   *     deleteUser(input: { id: "some-uuid" }) {
+   *       __typename
+   *       ... on BaseResponse  { statusCode success message timestamp }
+   *       ... on ErrorResponse { statusCode message timestamp }
+   *     }
+   *   }
    */
-  @Mutation(() => Boolean, { description: 'Delete a user' })
-  deleteUser(@Args('input') input: DeleteUserInput): Promise<boolean> {
-    return this.usersService.delete(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Delete a user. Emits user.deleted Kafka event — blog orphans removed.',
+  })
+  async deleteUser(
+    @Args('input') input: DeleteUserInput,
+  ): Promise<ApiResponseType> {
+    try {
+      await this.usersService.delete(input);
+      return ResponseFactory.deleted('User deleted successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
   /**
    * @resolveReference
-   * Apollo Router entity-resolution entry point.
+   * Apollo Federation entity resolution.
    *
-   * When blog-service resolves `author { id name email }`, the Router sends a
-   * batch `_entities` query to this subgraph containing `{ __typename: "User", id }`.
-   * This method must return the full `User` record so the Router can merge fields.
+   * Called by Apollo Router when blog-service returns `author { id }` and
+   * the client requests User fields like `name` or `email`.
+   * The Router sends an `_entities` batch query: `{ __typename: "User", id }`.
+   *
+   * Returns raw User (NOT wrapped in ApiResponse) — this is an internal
+   * Router-to-subgraph call, not a client-facing operation.
+   *
+   * @param {{ __typename: string; id: string }} reference - Federation key.
+   * @returns {User} Fully populated User entity.
    */
   @ResolveReference()
   resolveReference(reference: { __typename: string; id: string }): User {
+    // Note: if user is not found, NotFoundException propagates as a GraphQL error.
+    // This is correct behaviour — a dangling reference is a server-side data integrity issue.
     return this.usersService.resolveReference(reference);
   }
 }

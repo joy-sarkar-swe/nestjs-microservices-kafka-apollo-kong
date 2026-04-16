@@ -1,0 +1,216 @@
+# =============================================================================
+# blog-service — GraphQL Schema (Federation v2 Subgraph)
+# =============================================================================
+#
+# SOURCE OF TRUTH for:
+#   • GraphQL Code Generator
+#   • Apollo Studio schema checks / CI breaking-change detection
+#   • Rover CLI supergraph composition
+#   • Documentation and onboarding
+#
+# SYNC POLICY
+# ───────────
+# NestJS code-first generates this SDL at runtime from TypeScript decorators.
+# To regenerate from a running service:
+#   rover subgraph introspect http://localhost:3002/graphql > schema.graphql
+# Or set autoSchemaFile: './schema.graphql' in AppModule to auto-write on start.
+#
+# HOW AUTHOR RESOLUTION WORKS (per blog)
+# ───────────────────────────────────────
+# 1. Any query returning Blog(s) also triggers @ResolveField author().
+# 2. author() returns { id: blog.authorId } for every blog in the result set.
+# 3. Apollo Router batches ALL User stubs into ONE _entities request to user-service.
+# 4. user-service resolveReference() returns full User { id name email } for each.
+# 5. Router stitches the User fields into each blog's author field.
+#
+# Result: resolving 100 blogs with author costs exactly 1 extra round-trip.
+# =============================================================================
+
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0",
+        import: ["@key", "@external", "@extends", "@requires", "@provides"])
+
+# ── Scalars ───────────────────────────────────────────────────────────────────
+
+"""ISO 8601 date-time string. Provided by graphql-scalars DateTimeResolver."""
+scalar DateTime
+
+# ── Federated Entity References ───────────────────────────────────────────────
+
+"""
+User stub in blog-service.
+@extends — type is owned by user-service.
+@key(fields:"id") — Apollo Router uses id to resolve full User from user-service.
+blog-service only stores and returns { id } — Router fills in name/email/etc.
+"""
+type User @extends @key(fields: "id") {
+  "User UUID — federation linking key"
+  id: ID! @external
+}
+
+# ── Domain Entity ─────────────────────────────────────────────────────────────
+
+"""
+A blog post owned by blog-service.
+@key(fields:"id") — Apollo Router routes _entities requests for Blog back here.
+"""
+type Blog @key(fields: "id") {
+  "Unique blog post identifier (UUID v4)"
+  id: ID!
+
+  "Post headline"
+  title: String!
+
+  "Post body text"
+  content: String!
+
+  "UUID of the author — references User.id in user-service"
+  authorId: ID!
+
+  """
+  Author resolved from user-service via Apollo Federation _entities.
+  Include this field in your query to trigger cross-service resolution:
+    data { author { id name email } }
+  The Router batches all author lookups into a single request to user-service.
+  """
+  author: User
+}
+
+# ── Response System ───────────────────────────────────────────────────────────
+
+"""A single field-level validation failure from class-validator."""
+type FieldError {
+  "The input field that failed validation"
+  field: String!
+  "Human-readable description of the failure"
+  message: String!
+}
+
+"""Returned when a blog-service operation fails for any reason."""
+type ErrorResponse {
+  "HTTP-equivalent status code (400 | 404 | 409 | 500)"
+  statusCode: Int!
+  "Always false"
+  success: Boolean!
+  "Human-readable error summary"
+  message: String!
+  "Field-level validation errors — present only on status 400"
+  errors: [FieldError!]
+  "Server-side response timestamp"
+  timestamp: DateTime!
+}
+
+"""Generic success confirmation for delete operations (no data payload)."""
+type BaseResponse {
+  "HTTP-equivalent status code (200)"
+  statusCode: Int!
+  "Always true"
+  success: Boolean!
+  "Human-readable success message"
+  message: String!
+  "Server-side response timestamp"
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a single Blog entity."""
+type BlogSuccessResponse {
+  "HTTP-equivalent status code (200 | 201)"
+  statusCode: Int!
+  "Always true"
+  success: Boolean!
+  "Human-readable success message"
+  message: String!
+  """
+  The resolved Blog entity.
+  Include author { id name email } to trigger federation resolution from user-service.
+  """
+  data: Blog!
+  "Server-side response timestamp"
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a list of Blog entities."""
+type BlogsSuccessResponse {
+  "HTTP-equivalent status code (200)"
+  statusCode: Int!
+  "Always true"
+  success: Boolean!
+  "Human-readable success message"
+  message: String!
+  """
+  The resolved Blog list.
+  Include data { author { id name email } } to trigger per-blog federation resolution.
+  The Router batches all author lookups into a single _entities request to user-service.
+  """
+  data: [Blog!]!
+  "Server-side response timestamp"
+  timestamp: DateTime!
+}
+
+"""
+Union of all possible blog-service operation outcomes.
+Discriminate on __typename in client queries.
+
+Example:
+  query {
+    getBlog(id: "…") {
+      __typename
+      ... on BlogSuccessResponse  { data { id title author { name email } } }
+      ... on ErrorResponse        { statusCode message errors { field message } }
+    }
+  }
+"""
+union ApiResponse =
+  | ErrorResponse
+  | BaseResponse
+  | BlogSuccessResponse
+  | BlogsSuccessResponse
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+
+"Input for creating a new blog post"
+input CreateBlogInput {
+  "Post headline (2–200 characters)"
+  title: String!
+  "Post body text (min 10 characters)"
+  content: String!
+  "UUID of the author — must reference an existing user in user-service"
+  authorId: ID!
+}
+
+"Input for partially updating a blog post (authorId is immutable)"
+input UpdateBlogInput {
+  "UUID of the blog post to update"
+  id: ID!
+  "New headline (optional)"
+  title: String
+  "New body text (optional)"
+  content: String
+}
+
+"Input for deleting a blog post"
+input DeleteBlogInput {
+  "UUID of the blog post to delete"
+  id: ID!
+}
+
+# ── Operations ────────────────────────────────────────────────────────────────
+
+type Query {
+  "Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."
+  getBlogs: ApiResponse!
+
+  "Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse."
+  getBlog(id: String!): ApiResponse!
+}
+
+type Mutation {
+  "Create a new blog post. Emits blog.created Kafka event on success."
+  createBlog(input: CreateBlogInput!): ApiResponse!
+
+  "Partially update a blog post. Emits blog.updated Kafka event."
+  updateBlog(input: UpdateBlogInput!): ApiResponse!
+
+  "Delete a blog post. Emits blog.deleted Kafka event."
+  deleteBlog(input: DeleteBlogInput!): ApiResponse!
+}

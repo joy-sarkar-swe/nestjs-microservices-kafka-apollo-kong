@@ -6,18 +6,18 @@ import { UsersKafkaController } from './users.kafka.controller';
 
 /**
  * @module UsersModule
- * @description Feature module encapsulating all user-domain logic.
+ * @description Feature module for the user domain.
  *
  * Providers
- * ├─ UsersService          — business logic + Kafka producer
- * └─ UsersResolver         — GraphQL queries / mutations / @ResolveReference
+ * ├─ UsersService         — business logic + Kafka producer
+ * └─ UsersResolver        — GraphQL queries / mutations / @ResolveReference
  *
  * Controllers
- * ├─ UsersRestController   — REST CRUD endpoints (for Kong)
- * └─ UsersKafkaController  — Kafka event consumer (for observability)
+ * ├─ UsersRestController  — REST /users/* (Kong)
+ * └─ UsersKafkaController — Kafka @EventPattern consumers
  *
  * Exports
- * └─ UsersService          — available to other modules if this module is imported
+ * └─ UsersService         — available to other modules if needed
  */
 @Module({
   providers: [UsersService, UsersResolver],

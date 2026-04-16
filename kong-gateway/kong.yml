@@ -1,43 +1,26 @@
 # =============================================================================
-# Kong Gateway — Declarative Configuration (DB-less mode)
+# Kong Gateway — Declarative Configuration (DB-less mode, kong 3.9.x)
 # =============================================================================
 #
-# Kong version: 3.9.x
-# Format:       kong.yml (declarative, loaded at startup via KONG_DECLARATIVE_CONFIG)
+# Kong routes REST requests directly to the microservice REST controllers.
+# Kong has NO knowledge of GraphQL, Apollo, or Federation.
+# Each service exposes both /graphql (for Apollo Router) and REST routes (for Kong).
 #
-# WHAT KONG DOES HERE
-# ───────────────────
-# Kong is a pure HTTP reverse proxy / API gateway.
-# It knows NOTHING about GraphQL, Apollo, or Federation.
-# It routes REST requests directly to the microservice REST controllers.
+# Kong architecture:
+#   Client → Kong :8000 → user-service :3001 /users/*
+#                       → blog-service :3002 /blogs/*
 #
-# Architecture
-# ────────────
-# Client  ──REST──►  Kong :8000  ──HTTP──►  user-service :3001 /users/*
-#                                       └──►  blog-service :3002 /blogs/*
-#
-# This is completely independent from Apollo Router:
-#   • Apollo Router → :4000  handles GraphQL (federation-aware)
-#   • Kong          → :8000  handles REST   (simple HTTP proxy)
-#
-# Both point at the SAME microservices. The services expose both /graphql and
-# /users (or /blogs) on the same port.
-#
-# RUNNING KONG LOCALLY (Docker only for Kong itself)
-# ──────────────────────────────────────────────────
-# docker run -d --name kong \
-#   -e KONG_DATABASE=off \
-#   -e KONG_DECLARATIVE_CONFIG=/etc/kong/kong.yml \
-#   -e KONG_PROXY_LISTEN=0.0.0.0:8000 \
-#   -e KONG_ADMIN_LISTEN=0.0.0.0:8001 \
-#   -v $(pwd)/kong-gateway/kong.yml:/etc/kong/kong.yml:ro \
-#   --add-host=host.docker.internal:host-gateway \
-#   -p 8000:8000 -p 8001:8001 \
-#   kong:3.9
-#
-# host.docker.internal resolves to the host machine from inside Docker,
-# allowing Kong to reach user-service (:3001) and blog-service (:3002)
-# running as plain Node.js processes on the host.
+# Run Kong:
+#   docker run -d --name kong \
+#     -e KONG_DATABASE=off \
+#     -e KONG_DECLARATIVE_CONFIG=/etc/kong/kong.yml \
+#     -e KONG_PROXY_LISTEN=0.0.0.0:8000 \
+#     -e KONG_ADMIN_LISTEN=0.0.0.0:8001 \
+#     -e KONG_ROUTER_FLAVOR=expressions \
+#     -v $(pwd)/kong-gateway/kong.yml:/etc/kong/kong.yml:ro \
+#     --add-host=host.docker.internal:host-gateway \
+#     -p 8000:8000 -p 8001:8001 \
+#     kong:3.9
 # =============================================================================
 
 _format_version: '3.0'
@@ -45,119 +28,40 @@ _transform: true
 
 services:
 
-  # ===========================================================================
-  # user-service upstream
-  # All /users/* routes proxy to http://host.docker.internal:3001
-  # ===========================================================================
+  # ── user-service upstream ──────────────────────────────────────────────────
   - name: user-service
-    # host.docker.internal → host machine (where NestJS is running)
     url: http://host.docker.internal:3001
     connect_timeout: 30000
     read_timeout: 30000
     write_timeout: 30000
     retries: 3
-
     routes:
-
-      # ── GET /users ──────────────────────────────────────────────────────────
-      # Returns all users.
-      # Upstream: GET http://localhost:3001/users
-      - name: get-all-users
-        methods: [GET]
+      - name: users-collection       # GET /users, POST /users
+        methods: [GET, POST]
         paths: [/users]
         strip_path: false
 
-      # ── POST /users ─────────────────────────────────────────────────────────
-      # Creates a new user.
-      # Upstream: POST http://localhost:3001/users
-      # Body: { "name": "Alice", "email": "alice@example.com" }
-      - name: create-user
-        methods: [POST]
-        paths: [/users]
-        strip_path: false
-
-      # ── GET /users/:id ──────────────────────────────────────────────────────
-      # Returns a single user by UUID.
-      # Upstream: GET http://localhost:3001/users/:id
-      # Kong regex capture: (?<id>[^/]+) captures the UUID segment.
-      - name: get-user-by-id
-        methods: [GET]
+      - name: users-by-id            # GET|PUT|DELETE /users/:id
+        methods: [GET, PUT, DELETE]
         paths:
           - ~/users/(?<id>[^/]+)$
         strip_path: false
 
-      # ── PUT /users/:id ──────────────────────────────────────────────────────
-      # Partially updates a user. Body fields are all optional (except id in URL).
-      # Upstream: PUT http://localhost:3001/users/:id
-      - name: update-user
-        methods: [PUT]
-        paths:
-          - ~/users/(?<id>[^/]+)$
-        strip_path: false
-
-      # ── DELETE /users/:id ───────────────────────────────────────────────────
-      # Deletes a user.
-      # Triggers user.deleted Kafka event → blog-service cleans orphaned posts.
-      # Upstream: DELETE http://localhost:3001/users/:id
-      - name: delete-user
-        methods: [DELETE]
-        paths:
-          - ~/users/(?<id>[^/]+)$
-        strip_path: false
-
-  # ===========================================================================
-  # blog-service upstream
-  # All /blogs/* routes proxy to http://host.docker.internal:3002
-  # ===========================================================================
+  # ── blog-service upstream ──────────────────────────────────────────────────
   - name: blog-service
     url: http://host.docker.internal:3002
     connect_timeout: 30000
     read_timeout: 30000
     write_timeout: 30000
     retries: 3
-
     routes:
-
-      # ── GET /blogs ──────────────────────────────────────────────────────────
-      # Returns all blog posts.
-      # Upstream: GET http://localhost:3002/blogs
-      - name: get-all-blogs
-        methods: [GET]
+      - name: blogs-collection       # GET /blogs, POST /blogs
+        methods: [GET, POST]
         paths: [/blogs]
         strip_path: false
 
-      # ── POST /blogs ─────────────────────────────────────────────────────────
-      # Creates a new blog post.
-      # Upstream: POST http://localhost:3002/blogs
-      # Body: { "title": "...", "content": "...", "authorId": "USER-UUID" }
-      - name: create-blog
-        methods: [POST]
-        paths: [/blogs]
-        strip_path: false
-
-      # ── GET /blogs/:id ──────────────────────────────────────────────────────
-      # Returns a single blog post by UUID.
-      # Upstream: GET http://localhost:3002/blogs/:id
-      - name: get-blog-by-id
-        methods: [GET]
-        paths:
-          - ~/blogs/(?<id>[^/]+)$
-        strip_path: false
-
-      # ── PUT /blogs/:id ──────────────────────────────────────────────────────
-      # Partially updates a blog post (title and/or content).
-      # Upstream: PUT http://localhost:3002/blogs/:id
-      - name: update-blog
-        methods: [PUT]
-        paths:
-          - ~/blogs/(?<id>[^/]+)$
-        strip_path: false
-
-      # ── DELETE /blogs/:id ───────────────────────────────────────────────────
-      # Deletes a blog post.
-      # Upstream: DELETE http://localhost:3002/blogs/:id
-      - name: delete-blog
-        methods: [DELETE]
+      - name: blogs-by-id            # GET|PUT|DELETE /blogs/:id
+        methods: [GET, PUT, DELETE]
         paths:
           - ~/blogs/(?<id>[^/]+)$
         strip_path: false

@@ -1,40 +1,12 @@
 version: '3.9'
 
 # =============================================================================
-# Docker Compose — Infrastructure Only
-# =============================================================================
-#
-# This file starts ONLY the infrastructure services:
-#   • Zookeeper  — required by Kafka
-#   • Kafka      — message broker for inter-service events
-#   • Kafka UI   — web UI to inspect topics and messages
-#   • Kong       — REST API gateway (DB-less, reads kong-gateway/kong.yml)
-#
-# NestJS microservices (user-service, blog-service) run as plain Node.js
-# processes on the host — NOT in Docker. This makes local development fast
-# (no Docker rebuild on code change) and is ideal for demos and lectures.
-#
-# Apollo Router also runs as a host binary — NOT in Docker.
-#
-# START COMMAND
-# ─────────────
-# docker compose up -d
-# Wait ~20s for Kafka to fully initialise before starting NestJS services.
-#
-# HOST → CONTAINER NETWORKING
-# ───────────────────────────
-# Kong needs to reach user-service (:3001) and blog-service (:3002) on the
-# host machine. The special hostname `host.docker.internal` resolves to the
-# host IP from inside any container. It is natively supported on Docker
-# Desktop (Mac/Windows). On Linux, add --add-host=host.docker.internal:host-gateway
-# to each container, or use the `extra_hosts` key (already set on Kong below).
+# Infrastructure Only — Kafka + Kong
+# NestJS services and Apollo Router run as host processes (no Docker).
 # =============================================================================
 
 services:
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Zookeeper — Kafka cluster co-ordinator
-  # ──────────────────────────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
     container_name: zookeeper
@@ -42,75 +14,39 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - '2181:2181'
-    networks:
-      - infra-net
+    ports: ['2181:2181']
+    networks: [infra-net]
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Kafka Broker
-  # ──────────────────────────────────────────────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.8.0
     container_name: kafka
     restart: unless-stopped
-    depends_on:
-      - zookeeper
-    ports:
-      # 9092 — exposed to the host (NestJS services connect here)
-      - '9092:9092'
-      # 29092 — internal Docker network listener (inter-container)
-      - '29092:29092'
+    depends_on: [zookeeper]
+    ports: ['9092:9092', '29092:29092']
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
-      # Two listeners:
-      #   PLAINTEXT      — used inside Docker network (Kafka UI → Kafka)
-      #   PLAINTEXT_HOST — used by host processes (NestJS → Kafka on :9092)
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      # Topics are created automatically when producers first publish
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 24
-    networks:
-      - infra-net
+    networks: [infra-net]
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Kafka UI — web dashboard for inspecting topics and messages
-  # Open: http://localhost:8080
-  # ──────────────────────────────────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     restart: unless-stopped
-    depends_on:
-      - kafka
-    ports:
-      - '8080:8080'
+    depends_on: [kafka]
+    ports: ['8080:8080']
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      # Uses the internal Docker listener (kafka:29092)
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-    networks:
-      - infra-net
+    networks: [infra-net]
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Kong API Gateway (DB-less mode)
-  # ──────────────────────────────────────────────────────────────────────────
-  # Kong reads kong-gateway/kong.yml at startup and proxies:
-  #   /users/* → http://host.docker.internal:3001 (user-service on host)
-  #   /blogs/* → http://host.docker.internal:3002 (blog-service on host)
-  #
-  # Endpoints:
-  #   http://localhost:8000  — Proxy (REST API gateway)
-  #   http://localhost:8001  — Admin API (read-only in DB-less mode)
-  # ──────────────────────────────────────────────────────────────────────────
   kong:
     image: kong:3.9
     container_name: kong
@@ -124,19 +60,13 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: '0.0.0.0:8001'
       KONG_PROXY_LISTEN: '0.0.0.0:8000'
-      # Enable router flavour that supports regex path captures
       KONG_ROUTER_FLAVOR: expressions
-    ports:
-      - '8000:8000'   # REST Proxy entry point
-      - '8001:8001'   # Admin API
+    ports: ['8000:8000', '8001:8001']
     volumes:
-      # Mount the kong.yml config file read-only into the container
       - ./kong-gateway/kong.yml:/etc/kong/kong.yml:ro
-    # On Linux, map host.docker.internal → host gateway IP
     extra_hosts:
       - 'host.docker.internal:host-gateway'
-    networks:
-      - infra-net
+    networks: [infra-net]
     healthcheck:
       test: ['CMD', 'kong', 'health']
       interval: 10s

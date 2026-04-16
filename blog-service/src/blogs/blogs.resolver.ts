@@ -1,39 +1,54 @@
 import {
-  Resolver,
-  Query,
-  Mutation,
-  Args,
-  ResolveReference,
-  ResolveField,
-  Parent,
+  Resolver, Query, Mutation, Args,
+  ResolveReference, ResolveField, Parent,
 } from '@nestjs/graphql';
+import { HttpStatus } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { Blog, User } from './entities/blog.entity';
-import {
-  CreateBlogInput,
-  UpdateBlogInput,
-  DeleteBlogInput,
-} from './dto/blog.input';
+import { CreateBlogInput, UpdateBlogInput, DeleteBlogInput } from './dto/blog.input';
+import { ApiResponse, ApiResponseType } from '../common/responses/api-response.union';
+import { ResponseFactory } from '../common/responses/response.factory';
 
 /**
  * @resolver BlogsResolver
  * @description GraphQL resolver for the blog-service Federation subgraph.
  *
- * Key design decisions
- * ────────────────────
- * 1. `author` @ResolveField returns `{ id: blog.authorId }` — a minimal User
- *    reference.  Apollo Router sees User's @key(fields: "id"), sends an
- *    `_entities` batch query to user-service, and stitches the full User
- *    object back into the response.  No direct HTTP call from blog-service
- *    to user-service — the Router orchestrates everything.
+ * All queries and mutations return the ApiResponse union.
+ * Clients discriminate on __typename:
  *
- * 2. `getBlogWithAuthor` is a named query alias for `getBlog` — it exists to
- *    make the cross-service federation demo more explicit in the playground.
- *    The actual cross-service join happens at the field level (author field),
- *    not at the query level.
+ *   query {
+ *     getBlog(id: "…") {
+ *       __typename
+ *       ... on BlogSuccessResponse {
+ *         statusCode success message timestamp
+ *         data {
+ *           id title content authorId
+ *           author { id name email }    ← resolved from user-service by Apollo Router
+ *         }
+ *       }
+ *       ... on ErrorResponse { statusCode message errors { field message } timestamp }
+ *     }
+ *   }
  *
- * 3. @ResolveReference handles the reverse direction: if any future subgraph
- *    references a Blog by id, the Router can resolve full Blog fields here.
+ * Author resolution — how it works per Blog object
+ * ─────────────────────────────────────────────────
+ * 1. Any query that returns Blog(s) triggers @ResolveField author().
+ * 2. author() returns { id: blog.authorId } for EVERY blog in the set.
+ * 3. Apollo Router collects all User stubs across the entire result set.
+ * 4. Router sends ONE batched _entities request to user-service:
+ *      { __typename: "User", id: "uuid-1" },
+ *      { __typename: "User", id: "uuid-2" }, ...
+ * 5. user-service resolveReference() returns full User for each id.
+ * 6. Router stitches name/email/etc. into each blog's author field.
+ *
+ * This means resolving 100 blogs with author data costs exactly ONE
+ * extra round-trip to user-service — not 100. This is Federation's
+ * DataLoader-style batching, built in at the protocol level.
+ *
+ * @ResolveReference
+ * ─────────────────
+ * If another future subgraph references a Blog by id, Apollo Router
+ * sends _entities here. Returns raw Blog (not ApiResponse) — internal call.
  */
 @Resolver(() => Blog)
 export class BlogsResolver {
@@ -43,14 +58,32 @@ export class BlogsResolver {
 
   /**
    * @query getBlogs
-   * Returns all blog posts (no author fields resolved unless requested).
+   * Returns all blog posts. Author fields resolved per-blog by the Router
+   * when the client includes `data { author { … } }` in the query.
    *
    * @example
-   *   query { getBlogs { id title content authorId } }
+   *   query {
+   *     getBlogs {
+   *       __typename
+   *       ... on BlogsSuccessResponse {
+   *         statusCode success message timestamp
+   *         data { id title content authorId author { id name email } }
+   *       }
+   *       ... on ErrorResponse { statusCode message timestamp }
+   *     }
+   *   }
    */
-  @Query(() => [Blog], { name: 'getBlogs', description: 'Fetch all blog posts' })
-  getBlogs(): Blog[] {
-    return this.blogsService.findAll();
+  @Query(() => ApiResponse, {
+    name: 'getBlogs',
+    description: 'Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse.',
+  })
+  async getBlogs(): Promise<ApiResponseType> {
+    try {
+      const blogs = this.blogsService.findAll();
+      return ResponseFactory.blogs(blogs, 'Blog posts retrieved successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
@@ -58,57 +91,55 @@ export class BlogsResolver {
    * Returns a single blog post by UUID.
    *
    * @example
-   *   query { getBlog(id: "…") { id title content authorId } }
-   */
-  @Query(() => Blog, { name: 'getBlog', description: 'Fetch one blog post by id' })
-  getBlog(@Args('id') id: string): Blog {
-    return this.blogsService.findOne(id);
-  }
-
-  /**
-   * @query getBlogWithAuthor
-   * Fetches a blog post AND triggers cross-service author resolution.
-   * When the client requests `author { id name email }`, Apollo Router
-   * automatically sends an _entities request to user-service.
-   *
-   * This query is identical to getBlog internally — the cross-service join
-   * is driven entirely by which fields the client requests, not by the query name.
-   * Named separately to make the federation demo explicit.
-   *
-   * @example
    *   query {
-   *     getBlogWithAuthor(id: "…") {
-   *       id title content
-   *       author { id name email }
+   *     getBlog(id: "some-uuid") {
+   *       __typename
+   *       ... on BlogSuccessResponse {
+   *         statusCode success message timestamp
+   *         data { id title content authorId author { id name email } }
+   *       }
+   *       ... on ErrorResponse { statusCode message timestamp }
    *     }
    *   }
    */
-  @Query(() => Blog, {
-    name: 'getBlogWithAuthor',
-    description: 'Fetch a blog post; request author { … } for cross-service resolution',
+  @Query(() => ApiResponse, {
+    name: 'getBlog',
+    description: 'Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.',
   })
-  getBlogWithAuthor(@Args('id') id: string): Blog {
-    return this.blogsService.findOne(id);
+  async getBlog(@Args('id', { type: () => String }) id: string): Promise<ApiResponseType> {
+    try {
+      const blog = this.blogsService.findOne(id);
+      return ResponseFactory.blog(blog, 'Blog post retrieved successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   // ── FIELD RESOLVER ────────────────────────────────────────────────────────
 
   /**
    * @resolveField author
-   * Returns a federation User reference `{ id }`.
+   * Returns the federation User reference for each Blog's author.
    *
-   * Why only return `{ id }` and not the full user?
-   * ─────────────────────────────────────────────────
-   * blog-service does NOT have access to user data — it only stores `authorId`.
-   * Returning `{ id }` is the Federation contract: the Router recognises the
-   * User @key, dispatches `_entities` to user-service, and merges the result.
-   * This is the core value proposition of Apollo Federation.
+   * This method is called ONCE PER BLOG in the result set.
+   * Returning { id } is the federation contract — the Apollo Router
+   * uses this id to batch-resolve full User fields from user-service
+   * in a single _entities round-trip regardless of result set size.
    *
-   * @param {Blog} blog - The parent Blog being resolved.
-   * @returns {User} Minimal User reference — Router fills in the rest.
+   * Why NOT call user-service directly from here?
+   * ─────────────────────────────────────────────
+   * • Direct HTTP calls would bypass federation batching → N+1 problem
+   * • Tight coupling between services → defeats the purpose of federation
+   * • The Router's _entities batching gives us automatic DataLoader behaviour
+   *
+   * @param blog - The parent Blog being resolved.
+   * @returns    - Minimal { id } User reference; Router fills in the rest.
    */
-  @ResolveField(() => User)
+  @ResolveField(() => User, {
+    description: 'Author resolved from user-service via Apollo Federation _entities',
+  })
   author(@Parent() blog: Blog): User {
+    // Return only the federation @key — Apollo Router resolves full User fields
     return { id: blog.authorId };
   }
 
@@ -116,59 +147,98 @@ export class BlogsResolver {
 
   /**
    * @mutation createBlog
-   * Creates a blog post linked to an existing user via authorId.
-   * Emits `blog.created` Kafka event.
+   * Creates a blog post. Returns BlogSuccessResponse (201) or ErrorResponse.
+   *
+   * Possible outcomes:
+   *   BlogSuccessResponse (201) — blog created
+   *   ErrorResponse (400)       — validation failed (caught by GqlValidationFilter)
+   *   ErrorResponse (500)       — unexpected error
    *
    * @example
    *   mutation {
    *     createBlog(input: {
    *       title: "My First Post"
-   *       content: "Hello, Federation!"
+   *       content: "Hello from blog-service!"
    *       authorId: "USER-UUID"
-   *     }) { id title content authorId }
+   *     }) {
+   *       __typename
+   *       ... on BlogSuccessResponse {
+   *         statusCode message timestamp
+   *         data { id title content authorId author { id name email } }
+   *       }
+   *       ... on ErrorResponse { statusCode message errors { field message } timestamp }
+   *     }
    *   }
    */
-  @Mutation(() => Blog, { description: 'Create a new blog post' })
-  createBlog(@Args('input') input: CreateBlogInput): Promise<Blog> {
-    return this.blogsService.create(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Create a new blog post. Emits blog.created Kafka event on success.',
+  })
+  async createBlog(@Args('input') input: CreateBlogInput): Promise<ApiResponseType> {
+    try {
+      const blog = await this.blogsService.create(input);
+      return ResponseFactory.blog(blog, 'Blog post created successfully', HttpStatus.CREATED);
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
    * @mutation updateBlog
-   * Partially updates title and/or content of an existing blog post.
-   * Emits `blog.updated` Kafka event.
+   * Partially updates a blog post. Returns BlogSuccessResponse or ErrorResponse.
    *
    * @example
    *   mutation {
-   *     updateBlog(input: { id: "…", title: "Updated Title" }) {
-   *       id title content
+   *     updateBlog(input: { id: "some-uuid", title: "Updated Title" }) {
+   *       __typename
+   *       ... on BlogSuccessResponse { statusCode message data { id title content } timestamp }
+   *       ... on ErrorResponse { statusCode message errors { field message } timestamp }
    *     }
    *   }
    */
-  @Mutation(() => Blog, { description: 'Update an existing blog post' })
-  updateBlog(@Args('input') input: UpdateBlogInput): Promise<Blog> {
-    return this.blogsService.update(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Partially update a blog post. Emits blog.updated Kafka event.',
+  })
+  async updateBlog(@Args('input') input: UpdateBlogInput): Promise<ApiResponseType> {
+    try {
+      const blog = await this.blogsService.update(input);
+      return ResponseFactory.blog(blog, 'Blog post updated successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   /**
    * @mutation deleteBlog
-   * Removes a blog post. Emits `blog.deleted` Kafka event.
+   * Deletes a blog post. Returns BaseResponse or ErrorResponse.
+   * Emits blog.deleted Kafka event.
    *
    * @example
-   *   mutation { deleteBlog(input: { id: "…" }) }
+   *   mutation {
+   *     deleteBlog(input: { id: "some-uuid" }) {
+   *       __typename
+   *       ... on BaseResponse  { statusCode success message timestamp }
+   *       ... on ErrorResponse { statusCode message timestamp }
+   *     }
+   *   }
    */
-  @Mutation(() => Boolean, { description: 'Delete a blog post' })
-  deleteBlog(@Args('input') input: DeleteBlogInput): Promise<boolean> {
-    return this.blogsService.delete(input);
+  @Mutation(() => ApiResponse, {
+    description: 'Delete a blog post. Emits blog.deleted Kafka event.',
+  })
+  async deleteBlog(@Args('input') input: DeleteBlogInput): Promise<ApiResponseType> {
+    try {
+      await this.blogsService.delete(input);
+      return ResponseFactory.deleted('Blog post deleted successfully');
+    } catch (error) {
+      return ResponseFactory.fromException(error);
+    }
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
   /**
    * @resolveReference
-   * Apollo Router entity-resolution entry point for Blog.
-   * If any future subgraph references a Blog by id, the Router sends an
-   * `_entities` request here to resolve the full Blog record.
+   * Apollo Router entity resolution for Blog.
+   * Returns raw Blog (not ApiResponse) — this is a Router-internal call.
    */
   @ResolveReference()
   resolveReference(reference: { __typename: string; id: string }): Blog {
