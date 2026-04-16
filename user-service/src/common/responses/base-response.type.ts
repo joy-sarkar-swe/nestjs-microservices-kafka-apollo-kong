@@ -1,4 +1,4 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
+import { ObjectType, Field, Int, Directive } from '@nestjs/graphql';
 import { DateTimeScalar } from '../graphql/scalars';
 
 /**
@@ -19,6 +19,7 @@ import { DateTimeScalar } from '../graphql/scalars';
  *     timestamp:  DateTime!
  *   }
  */
+@Directive('@shareable')
 @ObjectType({ description: 'Generic success confirmation without a data payload' })
 export class BaseResponse {
   /** HTTP-equivalent status code. Typically 200 or 204. */

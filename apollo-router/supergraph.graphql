@@ -1,0 +1,330 @@
+schema
+  @link(url: "https://specs.apollo.dev/link/v1.0")
+  @link(url: "https://specs.apollo.dev/join/v0.3", for: EXECUTION)
+{
+  query: Query
+  mutation: Mutation
+}
+
+directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
+
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boolean! = false, resolvable: Boolean! = true, isInterfaceObject: Boolean! = false) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+"""
+Union of all possible blog-service operation outcomes. Use __typename to discriminate in client queries.
+"""
+union ApiResponse
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+  @join__unionMember(graph: BLOG_SERVICE, member: "ErrorResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "ErrorResponse")
+  @join__unionMember(graph: BLOG_SERVICE, member: "BaseResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "BaseResponse")
+  @join__unionMember(graph: BLOG_SERVICE, member: "BlogSuccessResponse")
+  @join__unionMember(graph: BLOG_SERVICE, member: "BlogsSuccessResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "UserSuccessResponse")
+  @join__unionMember(graph: USER_SERVICE, member: "UsersSuccessResponse")
+ = ErrorResponse | BaseResponse | BlogSuccessResponse | BlogsSuccessResponse | UserSuccessResponse | UsersSuccessResponse
+
+"""Generic success confirmation without a data payload"""
+type BaseResponse
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""A blog post owned by blog-service"""
+type Blog
+  @join__type(graph: BLOG_SERVICE, key: "id")
+{
+  """Unique blog post identifier (UUID v4)"""
+  id: ID!
+
+  """Post headline"""
+  title: String!
+
+  """Post body text"""
+  content: String!
+
+  """UUID of the author — references User.id in user-service"""
+  authorId: ID!
+
+  """Author resolved from user-service via Apollo Federation"""
+  author: User
+}
+
+"""Success response wrapping a list of Blog entities"""
+type BlogsSuccessResponse
+  @join__type(graph: BLOG_SERVICE)
+{
+  statusCode: Int!
+  success: Boolean!
+  message: String!
+
+  """The resolved Blog list"""
+  data: [Blog!]!
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a single Blog entity"""
+type BlogSuccessResponse
+  @join__type(graph: BLOG_SERVICE)
+{
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """The resolved Blog entity"""
+  data: Blog!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""Input for creating a new blog post"""
+input CreateBlogInput
+  @join__type(graph: BLOG_SERVICE)
+{
+  """Post headline (2–200 characters)"""
+  title: String!
+
+  """Post body text (min 10 characters)"""
+  content: String!
+
+  """UUID of the author (must exist in user-service)"""
+  authorId: ID!
+}
+
+"""Input for creating a new user"""
+input CreateUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """Full display name (2–100 characters)"""
+  name: String!
+
+  """Valid email address"""
+  email: String!
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+
+"""Input for deleting a blog post"""
+input DeleteBlogInput
+  @join__type(graph: BLOG_SERVICE)
+{
+  """UUID of the blog post to delete"""
+  id: ID!
+}
+
+"""Input for deleting a user"""
+input DeleteUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """UUID of the user to delete"""
+  id: ID!
+}
+
+"""Returned when a blog-service operation fails"""
+type ErrorResponse
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always false for error responses"""
+  success: Boolean!
+
+  """Human-readable error summary"""
+  message: String!
+
+  """Field-level validation errors (present on status 400 only)"""
+  errors: [FieldError!]
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""A single field-level validation error"""
+type FieldError
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """The input field that failed validation"""
+  field: String!
+
+  """Human-readable description of the failure"""
+  message: String!
+}
+
+scalar join__FieldSet
+
+enum join__Graph {
+  BLOG_SERVICE @join__graph(name: "blog-service", url: "http://localhost:3002/graphql")
+  USER_SERVICE @join__graph(name: "user-service", url: "http://localhost:3001/graphql")
+}
+
+scalar link__Import
+
+enum link__Purpose {
+  """
+  `SECURITY` features provide metadata necessary to securely resolve fields.
+  """
+  SECURITY
+
+  """
+  `EXECUTION` features provide metadata necessary for operation execution.
+  """
+  EXECUTION
+}
+
+type Mutation
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """Create a new blog post. Emits blog.created Kafka event on success."""
+  createBlog(input: CreateBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+
+  """Partially update a blog post. Emits blog.updated Kafka event."""
+  updateBlog(input: UpdateBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+
+  """Delete a blog post. Emits blog.deleted Kafka event."""
+  deleteBlog(input: DeleteBlogInput!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+
+  """Create a new user. Emits user.created Kafka event on success."""
+  createUser(input: CreateUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+
+  """Partially update an existing user. Emits user.updated Kafka event."""
+  updateUser(input: UpdateUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+
+  """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
+  deleteUser(input: DeleteUserInput!): ApiResponse! @join__field(graph: USER_SERVICE)
+}
+
+type Query
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."""
+  getBlogs: ApiResponse! @join__field(graph: BLOG_SERVICE)
+
+  """
+  Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
+  """
+  getBlog(id: String!): ApiResponse! @join__field(graph: BLOG_SERVICE)
+
+  """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
+  getUsers: ApiResponse! @join__field(graph: USER_SERVICE)
+
+  """
+  Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
+  """
+  getUser(id: String!): ApiResponse! @join__field(graph: USER_SERVICE)
+}
+
+"""Input for partially updating a blog post"""
+input UpdateBlogInput
+  @join__type(graph: BLOG_SERVICE)
+{
+  """UUID of the blog post to update"""
+  id: ID!
+
+  """New headline"""
+  title: String
+
+  """New body text"""
+  content: String
+}
+
+"""Input for partially updating a user"""
+input UpdateUserInput
+  @join__type(graph: USER_SERVICE)
+{
+  """UUID of the user to update"""
+  id: ID!
+
+  """New display name"""
+  name: String
+
+  """New email address"""
+  email: String
+}
+
+"""User reference stub (owned by user-service)"""
+type User
+  @join__type(graph: BLOG_SERVICE, key: "id", extension: true)
+  @join__type(graph: USER_SERVICE, key: "id")
+{
+  """User UUID — federation linking key"""
+  id: ID!
+
+  """Full display name"""
+  name: String! @join__field(graph: USER_SERVICE)
+
+  """Unique email address"""
+  email: String! @join__field(graph: USER_SERVICE)
+}
+
+"""Success response wrapping a list of User entities"""
+type UsersSuccessResponse
+  @join__type(graph: USER_SERVICE)
+{
+  statusCode: Int!
+  success: Boolean!
+  message: String!
+
+  """The resolved User list"""
+  data: [User!]!
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a single User entity"""
+type UserSuccessResponse
+  @join__type(graph: USER_SERVICE)
+{
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """The resolved User entity"""
+  data: User!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}

@@ -1,4 +1,4 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
+import { ObjectType, Field, Int, Directive } from '@nestjs/graphql';
 import { DateTimeScalar } from '../graphql/scalars';
 import { FieldError } from './field-error.type';
 
@@ -12,6 +12,7 @@ import { FieldError } from './field-error.type';
  *     errors: [FieldError!]  timestamp: DateTime!
  *   }
  */
+@Directive('@shareable')
 @ObjectType({ description: 'Returned when a blog-service operation fails' })
 export class ErrorResponse {
   @Field(() => Int, { description: 'HTTP-equivalent status code' })
@@ -43,6 +44,7 @@ export class ErrorResponse {
  *     statusCode: Int!  success: Boolean!  message: String!  timestamp: DateTime!
  *   }
  */
+@Directive('@shareable')
 @ObjectType({ description: 'Generic success confirmation without a data payload' })
 export class BaseResponse {
   @Field(() => Int, { description: 'HTTP-equivalent status code' })

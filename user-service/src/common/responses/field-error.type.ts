@@ -1,4 +1,4 @@
-import { ObjectType, Field } from '@nestjs/graphql';
+import { ObjectType, Field, Directive } from '@nestjs/graphql';
 
 /**
  * @type FieldError
@@ -17,6 +17,7 @@ import { ObjectType, Field } from '@nestjs/graphql';
  * Example value:
  *   { field: "email", message: "email must be a valid address" }
  */
+@Directive('@shareable')
 @ObjectType({ description: 'A single field-level validation error' })
 export class FieldError {
   /**

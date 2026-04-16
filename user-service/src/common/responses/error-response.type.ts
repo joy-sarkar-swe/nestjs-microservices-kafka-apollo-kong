@@ -1,4 +1,4 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
+import { ObjectType, Field, Int, Directive } from '@nestjs/graphql';
 import { DateTimeScalar } from '../graphql/scalars';
 import { FieldError } from './field-error.type';
 
@@ -21,6 +21,7 @@ import { FieldError } from './field-error.type';
  *     timestamp:  DateTime!
  *   }
  */
+@Directive('@shareable')
 @ObjectType({ description: 'Returned when an operation fails for any reason' })
 export class ErrorResponse {
   /**

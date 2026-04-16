@@ -10,7 +10,8 @@
 # =============================================================================
 
 supergraph:
-  listen: 0.0.0.0:4000
+  listen: 127.0.0.1:4000
+  introspection: true
 
 cors:
   allow_any_origin: true
@@ -19,16 +20,16 @@ cors:
     - x-correlation-id
     - authorization
 
-homepage:
-  enabled: true
-
 sandbox:
   enabled: true
 
+homepage:
+  enabled: false
+
 include_subgraph_errors:
-  all: true   # Surface subgraph errors in dev — disable in production
+  all: true
 
 health_check:
-  listen: 0.0.0.0:4000
+  listen: 127.0.0.1:4000
   enabled: true
   path: /health
