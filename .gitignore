@@ -1,0 +1,139 @@
+# =========================
+# NestJS Microservices .gitignore (2026)
+# Monorepo / Multi-service ready (Kafka, Redis, Docker, CI/CD)
+# =========================
+
+# -------------------------
+# ROOT DEPENDENCIES
+# -------------------------
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn-cache/
+.yarnrc.yml
+
+# -------------------------
+# PER-SERVICE DEPENDENCIES
+# -------------------------
+apps/*/node_modules/
+services/*/node_modules/
+packages/*/node_modules/
+
+# -------------------------
+# BUILD OUTPUT (ALL SERVICES)
+# -------------------------
+dist/
+build/
+apps/*/dist/
+services/*/dist/
+packages/*/dist/
+coverage/
+*.tsbuildinfo
+
+# -------------------------
+# LOGS (GLOBAL + SERVICES)
+# -------------------------
+logs/
+*.log
+apps/*/logs/
+services/*/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -------------------------
+# ENV / SECRETS
+# -------------------------
+.env
+.env.*
+!.env.example
+apps/*/.env*
+services/*/.env*
+secrets/
+*.pem
+*.key
+
+# -------------------------
+# DOCKER / CONTAINERS
+# -------------------------
+docker-compose.override.yml
+docker-data/
+.env.docker
+*.tar
+
+# -------------------------
+# KAFKA / REDIS / MQ DATA
+# -------------------------
+kafka-data/
+zookeeper-data/
+redis-data/
+*.rdb
+*.aof
+
+# -------------------------
+# DATABASE FILES
+# -------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# -------------------------
+# CACHE / TEMP
+# -------------------------
+.cache/
+.tmp/
+temp/
+tmp/
+apps/*/.cache/
+services/*/.cache/
+
+# -------------------------
+# TESTING
+# -------------------------
+coverage/
+.nyc_output/
+jest-cache/
+*.lcov
+
+# -------------------------
+# IDE / EDITORS
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# -------------------------
+# OS FILES
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# NEST / TYPESCRIPT
+# -------------------------
+*.tsbuildinfo
+.nest-cli.json
+
+# -------------------------
+# MONOREPO TOOLING
+# -------------------------
+.turbo/
+nx-cache/
+dist-ssr/
+
+# -------------------------
+# BACKUPS / MISC
+# -------------------------
+*.bak
+*.backup
+*.old
+*.orig
+
+# =========================
+# END
+# =========================

@@ -25,7 +25,7 @@ import { BlogsModule } from './blogs/blogs.module';
       driver: ApolloFederationDriver,
       autoSchemaFile: {
         federation: 2,
-        // path: './schema.graphql',  // uncomment to write SDL to disk
+        path: './schema.graphql',  // uncomment to write SDL to disk
       },
       resolvers: {
         DateTime: DateTimeResolver as unknown as GraphQLScalarType,

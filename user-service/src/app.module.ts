@@ -42,7 +42,7 @@ import { UsersModule } from './users/users.module';
       // The generated file is what you commit for GraphQL Code Generator.
       autoSchemaFile: {
         federation: 2,
-        // path: './schema.graphql',   // ← uncomment to persist to disk
+        path: './schema.graphql',   // ← uncomment to persist to disk
       },
 
       // ── Scalar registration ──────────────────────────────────────────────
