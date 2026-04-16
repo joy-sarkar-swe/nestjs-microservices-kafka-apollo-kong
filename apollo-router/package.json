@@ -1,8 +1,8 @@
 {
   "name": "router",
   "scripts": {
-    "gen:sg": "rover supergraph compose --config supergraph.yaml --elv2-license accept > supergraph.graphql",
-    "start": "./router --config router.yaml --supergraph supergraph.graphql",
-    "dev": "rover dev --supergraph-config ./supergraph.yaml --router-config ./router.yaml --client-timeout 6100000 --elv2-license accept"
+    "gen:sg": "rover supergraph compose --config supergraph.yaml --elv2-license accept --output supergraph.graphql",
+    "start": "npm run gen:sg && ./router --config router.yaml --supergraph supergraph.graphql",
+    "dev": "npm run gen:sg && rover dev --supergraph-config ./supergraph.yaml --router-config ./router.yaml --client-timeout 6100000 --elv2-license accept"
   }
 }

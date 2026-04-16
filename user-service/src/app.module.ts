@@ -4,6 +4,7 @@ import {
   ApolloFederationDriverConfig,
 } from "@nestjs/apollo";
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { GraphQLModule } from "@nestjs/graphql";
 import { GraphQLScalarType } from "graphql";
 import { DateTimeResolver } from "graphql-scalars";
@@ -35,6 +36,11 @@ import { UsersModule } from "./users/users.module";
  */
 @Module({
   imports: [
+    // ── Configuration ───────────────────────────────────────────────────
+    ConfigModule.forRoot({
+      isGlobal: true, // Makes ConfigService available everywhere
+    }),
+
     GraphQLModule.forRoot<ApolloFederationDriverConfig>({
       driver: ApolloFederationDriver,
 

@@ -223,16 +223,16 @@ docker compose logs kafka | grep "started (kafka.server.KafkaServer)"
 
 ```bash
 cd user-service && npm install && npm run start:dev
-# → http://localhost:3001/graphql  (subgraph)
-# → http://localhost:3001/users/*  (REST)
+# → http://localhost:4001/graphql  (subgraph)
+# → http://localhost:4001/users/*  (REST)
 ```
 
 ### Step 3 — Start blog-service (Terminal 2)
 
 ```bash
 cd blog-service && npm install && npm run start:dev
-# → http://localhost:3002/graphql  (subgraph)
-# → http://localhost:3002/blogs/*  (REST)
+# → http://localhost:4002/graphql  (subgraph)
+# → http://localhost:4002/blogs/*  (REST)
 ```
 
 ### Step 4 — Compose supergraph & start Apollo Router (Terminal 3)
@@ -547,7 +547,7 @@ npx graphql-codegen
 → All services must be running before composing.
 
 **Apollo Router can't reach subgraphs**
-→ Verify services are still running on http://localhost:3001 and http://localhost:\*.
+→ Verify services are still running on http://localhost:4001 and http://localhost:\*.
 
 **Kong returns 404**
 

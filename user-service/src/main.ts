@@ -1,8 +1,8 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { AppModule } from './app.module';
-import { GqlValidationFilter } from './common/filters/gql-validation.filter';
+import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { AppModule } from "./app.module";
+import { GqlValidationFilter } from "./common/filters/gql-validation.filter";
 
 /**
  * @bootstrap
@@ -34,10 +34,10 @@ async function bootstrap(): Promise<void> {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'user-service',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "user-service",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
-      consumer: { groupId: 'user-service-group' },
+      consumer: { groupId: "user-service-group" },
     },
   });
 
@@ -52,7 +52,7 @@ async function bootstrap(): Promise<void> {
       // Return structured ValidationError[] instead of plain string messages
       // so GqlValidationFilter can extract field-level details.
       exceptionFactory: (errors) => {
-        const { BadRequestException } = require('@nestjs/common');
+        const { BadRequestException } = require("@nestjs/common");
         return new BadRequestException(errors);
       },
     }),
@@ -66,12 +66,15 @@ async function bootstrap(): Promise<void> {
   app.enableCors();
 
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT || 3001);
+  const port = process.env.PORT || 4001;
+  await app.listen(port);
 
-  console.log('🚀 user-service running on http://localhost:3001');
-  console.log('   ├─ GraphQL subgraph : http://localhost:3001/graphql');
-  console.log('   └─ REST (Kong)      : http://localhost:3001/users/*');
-  console.log(`📨 Kafka consumer      : ${process.env.KAFKA_BROKER || 'localhost:9092'} [user-service-group]`);
+  console.log(`🚀 user-service running on http://localhost:${port}`);
+  console.log(`   ├─ GraphQL subgraph : http://localhost:${port}/graphql`);
+  console.log(`   └─ REST (Kong)      : http://localhost:${port}/users/*`);
+  console.log(
+    `📨 Kafka consumer      : ${process.env.KAFKA_BROKER || "localhost:9092"} [user-service-group]`,
+  );
 }
 
 bootstrap();

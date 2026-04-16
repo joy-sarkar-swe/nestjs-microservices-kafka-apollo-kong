@@ -44,11 +44,12 @@ async function bootstrap(): Promise<void> {
   app.enableCors();
 
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT || 3002);
+  const port = process.env.PORT || 4002;
+  await app.listen(port);
 
-  console.log('🚀 blog-service running on http://localhost:3002');
-  console.log('   ├─ GraphQL subgraph : http://localhost:3002/graphql');
-  console.log('   └─ REST (Kong)      : http://localhost:3002/blogs/*');
+  console.log(`🚀 blog-service running on http://localhost:${port}`);
+  console.log(`   ├─ GraphQL subgraph : http://localhost:${port}/graphql`);
+  console.log(`   └─ REST (Kong)      : http://localhost:${port}/blogs/*`);
   console.log(`📨 Kafka consumer      : ${process.env.KAFKA_BROKER || 'localhost:9092'} [blog-service-group]`);
 }
 
