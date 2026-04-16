@@ -145,20 +145,24 @@ ApiResponse (union)
 
 ```typescript
 // Single entity success
-return ResponseFactory.user(user, 'User created successfully', HttpStatus.CREATED);
+return ResponseFactory.user(
+  user,
+  "User created successfully",
+  HttpStatus.CREATED,
+);
 
 // List success
-return ResponseFactory.users(users, 'Users retrieved successfully');
+return ResponseFactory.users(users, "Users retrieved successfully");
 
 // Delete success
-return ResponseFactory.deleted('User deleted successfully');
+return ResponseFactory.deleted("User deleted successfully");
 
 // From caught exception (maps status codes automatically)
 return ResponseFactory.fromException(error);
 
 // Manual errors
 return ResponseFactory.notFound('User "abc" not found');
-return ResponseFactory.conflict('Email already registered');
+return ResponseFactory.conflict("Email already registered");
 return ResponseFactory.validationError(fieldErrors);
 ```
 
@@ -235,6 +239,7 @@ cd blog-service && npm install && npm run start:dev
 
 ```bash
 cd apollo-router
+curl -sSL https://rover.apollo.dev/nix/latest | sh # for the first-time
 rover supergraph compose --config supergraph.yaml > supergraph.graphql
 ./router --config router.yaml --supergraph supergraph.graphql
 # → http://localhost:4000  (GraphQL unified entry point)
@@ -262,20 +267,28 @@ mutation {
       success
       message
       timestamp
-      data { id name email }
+      data {
+        id
+        name
+        email
+      }
     }
     ... on ErrorResponse {
       statusCode
       success
       message
       timestamp
-      errors { field message }
+      errors {
+        field
+        message
+      }
     }
   }
 }
 ```
 
 **Response (201 success):**
+
 ```json
 {
   "data": {
@@ -285,7 +298,11 @@ mutation {
       "success": true,
       "message": "User created successfully",
       "timestamp": "2025-04-16T10:30:00.000Z",
-      "data": { "id": "uuid-here", "name": "Alice Johnson", "email": "alice@example.com" }
+      "data": {
+        "id": "uuid-here",
+        "name": "Alice Johnson",
+        "email": "alice@example.com"
+      }
     }
   }
 }
@@ -298,14 +315,21 @@ mutation {
   createUser(input: { name: "", email: "not-an-email" }) {
     __typename
     ... on ErrorResponse {
-      statusCode success message timestamp
-      errors { field message }
+      statusCode
+      success
+      message
+      timestamp
+      errors {
+        field
+        message
+      }
     }
   }
 }
 ```
 
 **Response (400 validation):**
+
 ```json
 {
   "data": {
@@ -316,8 +340,8 @@ mutation {
       "message": "Validation failed",
       "timestamp": "2025-04-16T10:30:00.000Z",
       "errors": [
-        { "field": "name",  "message": "name must not be empty" },
-        { "field": "name",  "message": "name must be at least 2 characters" },
+        { "field": "name", "message": "name must not be empty" },
+        { "field": "name", "message": "name must be at least 2 characters" },
         { "field": "email", "message": "email must be a valid email address" }
       ]
     }
@@ -328,6 +352,7 @@ mutation {
 ### createUser — conflict error (duplicate email)
 
 **Response (409 conflict):**
+
 ```json
 {
   "data": {
@@ -347,21 +372,39 @@ mutation {
 
 ```graphql
 mutation {
-  createBlog(input: {
-    title: "My First Post"
-    content: "Hello from blog-service via Apollo Federation!"
-    authorId: "PASTE-USER-UUID"
-  }) {
+  createBlog(
+    input: {
+      title: "My First Post"
+      content: "Hello from blog-service via Apollo Federation!"
+      authorId: "PASTE-USER-UUID"
+    }
+  ) {
     __typename
     ... on BlogSuccessResponse {
-      statusCode success message timestamp
+      statusCode
+      success
+      message
+      timestamp
       data {
-        id title content authorId
-        author { id name email }
+        id
+        title
+        content
+        authorId
+        author {
+          id
+          name
+          email
+        }
       }
     }
     ... on ErrorResponse {
-      statusCode message errors { field message } timestamp
+      statusCode
+      message
+      errors {
+        field
+        message
+      }
+      timestamp
     }
   }
 }
@@ -374,13 +417,27 @@ query {
   getBlogs {
     __typename
     ... on BlogsSuccessResponse {
-      statusCode success message timestamp
+      statusCode
+      success
+      message
+      timestamp
       data {
-        id title content authorId
-        author { id name email }
+        id
+        title
+        content
+        authorId
+        author {
+          id
+          name
+          email
+        }
       }
     }
-    ... on ErrorResponse { statusCode message timestamp }
+    ... on ErrorResponse {
+      statusCode
+      message
+      timestamp
+    }
   }
 }
 ```
@@ -394,8 +451,17 @@ query {
 mutation {
   deleteUser(input: { id: "PASTE-UUID" }) {
     __typename
-    ... on BaseResponse  { statusCode success message timestamp }
-    ... on ErrorResponse { statusCode message timestamp }
+    ... on BaseResponse {
+      statusCode
+      success
+      message
+      timestamp
+    }
+    ... on ErrorResponse {
+      statusCode
+      message
+      timestamp
+    }
   }
 }
 ```
@@ -464,26 +530,27 @@ npx graphql-codegen
 
 ## Kafka Topics
 
-| Topic          | Emitted by   | Consumed by                    | Effect                              |
-|----------------|--------------|--------------------------------|-------------------------------------|
-| `user.created` | user-service | user-service, blog-service     | Observability hooks                 |
-| `user.updated` | user-service | user-service, blog-service     | Cache invalidation hooks            |
-| `user.deleted` | user-service | user-service, blog-service ⚡  | blog-service removes orphaned posts |
-| `blog.created` | blog-service | blog-service                   | Search index / analytics hooks      |
-| `blog.updated` | blog-service | blog-service                   | CDN purge hooks                     |
-| `blog.deleted` | blog-service | blog-service                   | Search removal / cleanup hooks      |
+| Topic          | Emitted by   | Consumed by                   | Effect                              |
+| -------------- | ------------ | ----------------------------- | ----------------------------------- |
+| `user.created` | user-service | user-service, blog-service    | Observability hooks                 |
+| `user.updated` | user-service | user-service, blog-service    | Cache invalidation hooks            |
+| `user.deleted` | user-service | user-service, blog-service ⚡ | blog-service removes orphaned posts |
+| `blog.created` | blog-service | blog-service                  | Search index / analytics hooks      |
+| `blog.updated` | blog-service | blog-service                  | CDN purge hooks                     |
+| `blog.deleted` | blog-service | blog-service                  | Search removal / cleanup hooks      |
 
 ---
 
 ## Troubleshooting
 
 **`rover supergraph compose` fails**
-→ Both user-service AND blog-service must be running before composing.
+→ All services must be running before composing.
 
 **Apollo Router can't reach subgraphs**
-→ Verify services are still running on :3001 and :3002.
+→ Verify services are still running on http://localhost:3001 and http://localhost:\*.
 
 **Kong returns 404**
+
 ```bash
 curl http://localhost:8001/routes | jq .   # verify routes loaded
 docker compose restart kong
@@ -491,9 +558,9 @@ docker compose restart kong
 
 **`host.docker.internal` not resolving (Linux)**
 → Add `--add-host=host.docker.internal:host-gateway` to the Kong container,
-  or use the `extra_hosts` key (already set in docker-compose.yml).
+or use the `extra_hosts` key (already set in docker-compose.yml).
 
 **Validation errors NOT appearing as ErrorResponse**
 → Ensure `GqlValidationFilter` is registered in `main.ts` via `app.useGlobalFilters()`.
 → Ensure `ValidationPipe.exceptionFactory` returns `new BadRequestException(errors)`
-  (passing the raw ValidationError[], not a string).
+(passing the raw ValidationError[], not a string).
