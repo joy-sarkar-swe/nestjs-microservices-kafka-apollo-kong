@@ -1,223 +1,144 @@
-# =============================================================================
-# user-service — GraphQL Schema (Federation v2 Subgraph)
-# =============================================================================
-#
-# SOURCE OF TRUTH
-# ───────────────
-# This file is the authoritative SDL for:
-#   • GraphQL Code Generator  (generates TypeScript types for clients)
-#   • Apollo Studio schema checks (CI schema validation / breaking change detection)
-#   • Rover CLI supergraph composition  (rover supergraph compose reads this)
-#   • Documentation and onboarding
-#
-# SYNC POLICY
-# ───────────
-# NestJS code-first generates the same SDL at runtime from TypeScript decorators.
-# This file must stay in sync with the runtime schema.
-# To regenerate from running service:
-#   rover subgraph introspect http://localhost:3001/graphql > schema.graphql
-#
-# Or set autoSchemaFile: './schema.graphql' in AppModule to auto-write on startup.
-#
-# USAGE WITH GRAPHQL CODE GENERATOR
-# ──────────────────────────────────
-# Install:  npm install -D @graphql-codegen/cli @graphql-codegen/typescript
-# Config:   codegen.yml → schema: ./schema.graphql
-# Run:      npx graphql-codegen
-# =============================================================================
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
 
-# Federation v2 link directive
-extend schema
-  @link(url: "https://specs.apollo.dev/federation/v2.0",
-        import: ["@key", "@external", "@requires", "@provides", "@shareable"])
-
-# ── Scalars ───────────────────────────────────────────────────────────────────
-
-"""
-ISO 8601 date-time string (e.g. "2025-04-16T10:30:00.000Z").
-Provided by graphql-scalars DateTimeResolver.
-"""
-scalar DateTime
-
-# ── Domain Entity ─────────────────────────────────────────────────────────────
-
-"""
-A registered user in the system.
-Federation entity — owned by user-service.
-Other subgraphs can extend this type using @key(fields: "id").
-"""
-type User @key(fields: "id") {
-  "Unique user identifier (UUID v4)"
+"""A registered user in the system"""
+type User {
+  """Unique user identifier (UUID v4)"""
   id: ID!
 
-  "Full display name"
+  """Full display name"""
   name: String!
 
-  "Unique email address"
+  """Unique email address"""
   email: String!
 }
 
-# ── Response System ───────────────────────────────────────────────────────────
-
-"""
-A single field-level validation failure produced by class-validator.
-Present on ErrorResponse when statusCode is 400.
-"""
+"""A single field-level validation error"""
 type FieldError {
-  "The input field that failed validation"
+  """The input field that failed validation"""
   field: String!
 
-  "Human-readable description of the failure"
+  """Human-readable description of the failure"""
   message: String!
 }
-
-"""
-Returned when an operation fails for any reason.
-Discriminate on __typename === 'ErrorResponse'.
-"""
-type ErrorResponse {
-  "HTTP-equivalent status code (400 | 404 | 409 | 500)"
-  statusCode: Int!
-
-  "Always false for error responses"
-  success: Boolean!
-
-  "Human-readable error summary"
-  message: String!
-
-  "Field-level validation errors — present only on status 400"
-  errors: [FieldError!]
-
-  "Server-side response timestamp (ISO 8601)"
-  timestamp: DateTime!
-}
-
-"""
-Generic success confirmation without a data payload.
-Returned by operations that delete a resource.
-Discriminate on __typename === 'BaseResponse'.
-"""
-type BaseResponse {
-  "HTTP-equivalent status code (200 | 204)"
-  statusCode: Int!
-
-  "Always true for success responses"
-  success: Boolean!
-
-  "Human-readable success message"
-  message: String!
-
-  "Server-side response timestamp (ISO 8601)"
-  timestamp: DateTime!
-}
-
-"""
-Success response wrapping a single User entity.
-Discriminate on __typename === 'UserSuccessResponse'.
-"""
-type UserSuccessResponse {
-  "HTTP-equivalent status code (200 | 201)"
-  statusCode: Int!
-
-  "Always true for success responses"
-  success: Boolean!
-
-  "Human-readable success message"
-  message: String!
-
-  "The resolved User entity"
-  data: User!
-
-  "Server-side response timestamp (ISO 8601)"
-  timestamp: DateTime!
-}
-
-"""
-Success response wrapping a list of User entities.
-Discriminate on __typename === 'UsersSuccessResponse'.
-"""
-type UsersSuccessResponse {
-  "HTTP-equivalent status code (200)"
-  statusCode: Int!
-
-  "Always true for success responses"
-  success: Boolean!
-
-  "Human-readable success message"
-  message: String!
-
-  "The resolved User list"
-  data: [User!]!
-
-  "Server-side response timestamp (ISO 8601)"
-  timestamp: DateTime!
-}
-
-"""
-Union of all possible operation outcomes.
-All queries and mutations return this type.
-
-Client usage:
-  query {
-    getUser(id: "…") {
-      __typename
-      ... on UserSuccessResponse  { statusCode message timestamp data { id name email } }
-      ... on ErrorResponse        { statusCode message timestamp errors { field message } }
-    }
-  }
-"""
-union ApiResponse =
-  | ErrorResponse
-  | BaseResponse
-  | UserSuccessResponse
-  | UsersSuccessResponse
-
-# ── Inputs ────────────────────────────────────────────────────────────────────
-
-"Input for creating a new user"
-input CreateUserInput {
-  "Full display name (2–100 characters)"
-  name: String!
-
-  "Valid email address"
-  email: String!
-}
-
-"Input for partially updating a user"
-input UpdateUserInput {
-  "UUID of the user to update"
-  id: ID!
-
-  "New display name (optional)"
-  name: String
-
-  "New email address (optional)"
-  email: String
-}
-
-"Input for deleting a user"
-input DeleteUserInput {
-  "UUID of the user to delete"
-  id: ID!
-}
-
-# ── Operations ────────────────────────────────────────────────────────────────
 
 type Query {
-  "Fetch all users. Returns UsersSuccessResponse or ErrorResponse."
+  """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
   getUsers: ApiResponse!
 
-  "Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse."
+  """
+  Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
+  """
   getUser(id: String!): ApiResponse!
 }
 
+"""
+Union of all possible GraphQL operation outcomes. Use __typename to discriminate in client queries.
+"""
+union ApiResponse = ErrorResponse | BaseResponse | UserSuccessResponse | UsersSuccessResponse
+
+"""Returned when an operation fails for any reason"""
+type ErrorResponse {
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always false for error responses"""
+  success: Boolean!
+
+  """Human-readable error summary"""
+  message: String!
+
+  """Field-level validation errors (present on status 400 only)"""
+  errors: [FieldError!]
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+
+"""Generic success confirmation without a data payload"""
+type BaseResponse {
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a single User entity"""
+type UserSuccessResponse {
+  """HTTP-equivalent status code"""
+  statusCode: Int!
+
+  """Always true for success responses"""
+  success: Boolean!
+
+  """Human-readable success message"""
+  message: String!
+
+  """The resolved User entity"""
+  data: User!
+
+  """Server-side response timestamp"""
+  timestamp: DateTime!
+}
+
+"""Success response wrapping a list of User entities"""
+type UsersSuccessResponse {
+  statusCode: Int!
+  success: Boolean!
+  message: String!
+
+  """The resolved User list"""
+  data: [User!]!
+  timestamp: DateTime!
+}
+
 type Mutation {
-  "Create a new user. Emits user.created Kafka event on success."
+  """Create a new user. Emits user.created Kafka event on success."""
   createUser(input: CreateUserInput!): ApiResponse!
 
-  "Partially update an existing user. Emits user.updated Kafka event."
+  """Partially update an existing user. Emits user.updated Kafka event."""
   updateUser(input: UpdateUserInput!): ApiResponse!
 
-  "Delete a user. Emits user.deleted Kafka event — orphaned blogs removed."
+  """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
   deleteUser(input: DeleteUserInput!): ApiResponse!
+}
+
+"""Input for creating a new user"""
+input CreateUserInput {
+  """Full display name (2–100 characters)"""
+  name: String!
+
+  """Valid email address"""
+  email: String!
+}
+
+"""Input for partially updating a user"""
+input UpdateUserInput {
+  """UUID of the user to update"""
+  id: ID!
+
+  """New display name"""
+  name: String
+
+  """New email address"""
+  email: String
+}
+
+"""Input for deleting a user"""
+input DeleteUserInput {
+  """UUID of the user to delete"""
+  id: ID!
 }
