@@ -12,6 +12,7 @@ import {
   CreateUserInput,
   UpdateUserInput,
   DeleteUserInput,
+  GetUserArgs,
 } from './dto/user.input';
 import {
   UserResponse,
@@ -74,9 +75,9 @@ export class UsersResolver {
     name: 'getUser',
     description: 'Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.',
   })
-  async getUser(@Args('id', { type: () => String }) id: string): Promise<UserResponseType> {
+  async getUser(@Args('input') input: GetUserArgs): Promise<UserResponseType> {
     try {
-      const user = this.usersService.findOne(id);
+      const user = this.usersService.findOne(input.id);
       return ResponseFactory.user(user, 'User retrieved successfully');
     } catch (error) {
       return ResponseFactory.fromException(error);

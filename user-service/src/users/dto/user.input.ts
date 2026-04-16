@@ -96,3 +96,14 @@ export class DeleteUserInput {
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 }
+
+/**
+ * @dto GetUserArgs
+ * @description Argument for fetching a single user.
+ */
+@InputType({ description: 'Arguments for fetching a user by ID' })
+export class GetUserArgs {
+  @Field(() => ID, { description: 'UUID of the user to fetch' })
+  @IsUUID('4', { message: 'id must be a valid UUID v4' })
+  id: string;
+}

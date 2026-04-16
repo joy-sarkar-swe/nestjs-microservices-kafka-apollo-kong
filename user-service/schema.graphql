@@ -30,7 +30,7 @@ type Query {
   """
   Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
   """
-  getUser(id: String!): UserResponse!
+  getUser(input: GetUserArgs!): UserResponse!
 }
 
 """Returns UsersSuccessResponse or ErrorResponse"""
@@ -89,6 +89,12 @@ type UserSuccessResponse {
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+}
+
+"""Arguments for fetching a user by ID"""
+input GetUserArgs {
+  """UUID of the user to fetch"""
+  id: ID!
 }
 
 type Mutation {

@@ -5,7 +5,12 @@ import {
 import { HttpStatus } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { Blog, User } from './entities/blog.entity';
-import { CreateBlogInput, UpdateBlogInput, DeleteBlogInput } from './dto/blog.input';
+import {
+  CreateBlogInput,
+  UpdateBlogInput,
+  DeleteBlogInput,
+  GetBlogArgs,
+} from './dto/blog.input';
 import {
   BlogResponse,
   BlogsResponse,
@@ -65,9 +70,9 @@ export class BlogsResolver {
     name: 'getBlog',
     description: 'Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.',
   })
-  async getBlog(@Args('id', { type: () => String }) id: string): Promise<BlogResponseType> {
+  async getBlog(@Args('input') input: GetBlogArgs): Promise<BlogResponseType> {
     try {
-      const blog = this.blogsService.findOne(id);
+      const blog = this.blogsService.findOne(input.id);
       return ResponseFactory.blog(blog, 'Blog post retrieved successfully');
     } catch (error) {
       return ResponseFactory.fromException(error);

@@ -75,3 +75,14 @@ export class DeleteBlogInput {
   @IsUUID('4', { message: 'id must be a valid UUID v4' })
   id: string;
 }
+
+/**
+ * @dto GetBlogArgs
+ * @description Argument for fetching a single blog post.
+ */
+@InputType({ description: 'Arguments for fetching a blog post by ID' })
+export class GetBlogArgs {
+  @Field(() => ID, { description: 'UUID of the blog post to fetch' })
+  @IsUUID('4', { message: 'id must be a valid UUID v4' })
+  id: string;
+}

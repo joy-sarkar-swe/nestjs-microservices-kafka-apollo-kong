@@ -42,7 +42,7 @@ type Query {
   """
   Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
   """
-  getBlog(id: String!): BlogResponse!
+  getBlog(input: GetBlogArgs!): BlogResponse!
 }
 
 """Returns BlogsSuccessResponse or ErrorResponse"""
@@ -101,6 +101,12 @@ type BlogSuccessResponse {
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+}
+
+"""Arguments for fetching a blog post by ID"""
+input GetBlogArgs {
+  """UUID of the blog post to fetch"""
+  id: ID!
 }
 
 type Mutation {
