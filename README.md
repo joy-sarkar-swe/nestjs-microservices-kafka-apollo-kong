@@ -22,16 +22,16 @@
 ## Architecture
 
 ```
-                        CLIENT
-              ┌──────────┴─────────┐
-           GraphQL                REST
-              │                    │
-              ▼                    ▼
+                     CLIENT
+            ┌──────────┴─────────┐
+         GraphQL                REST
+            │                    │
+            ▼                    ▼
    ┌─────────────────┐   ┌─────────────────┐
    │  Apollo Router  │   │  Kong Gateway   │
    │  :4000 (GQL)    │   │  :8000 (REST)   │
    └────────┬────────┘   └────────┬────────┘
-            │ Federation           │
+            │ Federation          │
     ┌───────┴───────┐     ┌───────┴───────┐
     ▼               ▼     ▼               ▼
 ┌──────────┐   ┌──────────┐ (same services)
@@ -89,40 +89,40 @@
 │   │   │   ├── filters/        gql-validation.filter.ts
 │   │   │   ├── graphql/        scalars.ts
 │   │   │   ├── kafka/
-│   │   │   │   └── kafka-event.interface.ts  ← NEW: typed envelope
-│   │   │   ├── responses/      (unchanged)
-│   │   │   └── validators/     (unchanged)
+│   │   │   │   └── kafka-event.interface.ts  : typed envelope
+│   │   │   ├── responses/
+│   │   │   └── validators/
 │   │   ├── realtime/
-│   │   │   └── user-events.gateway.ts        ← NEW: Socket.IO /users
+│   │   │   └── user-events.gateway.ts        : Socket.IO /users
 │   │   └── users/
 │   │       ├── repositories/
-│   │       │   ├── user.repository.interface.ts     ← NEW
-│   │       │   └── in-memory-user.repository.ts     ← NEW
-│   │       ├── dto/            (unchanged)
-│   │       ├── entities/       (unchanged)
-│   │       ├── users.service.ts        ← MODIFIED: uses UserRepository
-│   │       ├── users.resolver.ts       ← MODIFIED: async + Subscriptions
-│   │       ├── users.rest.controller.ts ← MODIFIED: all methods async
-│   │       ├── users.kafka.controller.ts ← MODIFIED: idempotency+DLQ+realtime
-│   │       └── users.module.ts          ← MODIFIED: DI tokens wired
-│   ├── app.module.ts    ← MODIFIED: subscriptions: { 'graphql-ws': ... }
-│   └── main.ts          ← MODIFIED: IoAdapter added
+│   │       │   ├── user.repository.interface.ts
+│   │       │   └── in-memory-user.repository.ts
+│   │       ├── dto/
+│   │       ├── entities/
+│   │       ├── users.service.ts
+│   │       ├── users.resolver.ts
+│   │       ├── users.rest.controller.ts
+│   │       ├── users.kafka.controller.ts
+│   │       └── users.module.ts
+│   ├── app.module.ts
+│   └── main.ts
 │
 ├── blog-service/
 │   └── src/
 │       ├── common/kafka/
-│       │   └── kafka-event.interface.ts         ← NEW
+│       │   └── kafka-event.interface.ts
 │       ├── realtime/
-│       │   └── blog-events.gateway.ts           ← NEW: Socket.IO /blogs
+│       │   └── blog-events.gateway.ts           : Socket.IO /blogs
 │       └── blogs/
 │           ├── repositories/
-│           │   ├── blog.repository.interface.ts ← NEW
-│           │   └── in-memory-blog.repository.ts ← NEW
+│           │   ├── blog.repository.interface.ts
+│           │   └── in-memory-blog.repository.ts
 │           ├── blogs.service.ts          ← MODIFIED: uses BlogRepository
-│           ├── blogs.resolver.ts         ← MODIFIED: async + Subscriptions
+│           ├── blogs.resolver.ts
 │           ├── blogs.rest.controller.ts  ← MODIFIED: async
-│           ├── blogs.kafka.controller.ts ← MODIFIED: idempotency+DLQ+realtime
-│           └── blogs.module.ts           ← MODIFIED: DI tokens wired
+│           ├── blogs.kafka.controller.ts
+│           └── blogs.module.ts
 │
 ├── docker-compose.yml   ← MODIFIED: kafka-init creates DLQ topics
 └── README.md
