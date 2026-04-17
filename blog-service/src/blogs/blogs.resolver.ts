@@ -1,8 +1,9 @@
 import {
   Resolver, Query, Mutation, Args,
-  ResolveReference, ResolveField, Parent,
+  ResolveReference, ResolveField, Parent, Subscription,
 } from '@nestjs/graphql';
-import { HttpStatus } from '@nestjs/common';
+import { Inject, HttpStatus } from '@nestjs/common';
+import { PubSub } from 'graphql-subscriptions';
 import { BlogsService } from './blogs.service';
 import { Blog, User } from './entities/blog.entity';
 import {
@@ -25,54 +26,51 @@ import { ResponseFactory } from '../common/responses/response.factory';
  * @resolver BlogsResolver
  * @description GraphQL resolver for the blog-service Federation subgraph.
  *
- * Specialized response unions are used to ensure precise GraphQL outcomes:
- * - BlogResponse: Returns BlogSuccessResponse or ErrorResponse
- * - BlogsResponse: Returns BlogsSuccessResponse or ErrorResponse
- * - BaseApiResponse: Returns BaseResponse or ErrorResponse
+ * Pattern B — real-time layer
+ * ────────────────────────────
+ * Three GraphQL subscriptions mirror the three mutation topics:
+ *   blogCreated — fires after blog.created Kafka event is consumed
+ *   blogUpdated — fires after blog.updated Kafka event is consumed
+ *   blogDeleted — fires after blog.deleted Kafka event is consumed
  *
- * Author resolution — how it works per Blog object
- * ─────────────────────────────────────────────────
- * 1. Any query that returns Blog(s) triggers @ResolveField author().
- * 2. author() returns { id: blog.authorId } for EVERY blog in the set.
- * 3. Apollo Router collects all User stubs across the entire result set.
- * 4. Router sends ONE batched _entities request to user-service.
- * 5. user-service resolveReference() returns full User for each id.
- * 6. Router stitches name/email/etc. into each blog's author field.
+ * Author resolution (Federation)
+ * ──────────────────────────────
+ * @ResolveField author() returns { id: blog.authorId } for every Blog.
+ * Apollo Router batches all stubs into one _entities request to user-service.
+ * This resolver never calls user-service directly.
+ *
+ * All methods are async — required because BlogsService and BlogRepository
+ * are both async (supports real DB backends transparently).
  */
 @Resolver(() => Blog)
 export class BlogsResolver {
-  constructor(private readonly blogsService: BlogsService) {}
+  constructor(
+    private readonly blogsService: BlogsService,
+    @Inject('GQL_PUB_SUB') private readonly pubSub: PubSub,
+  ) {}
 
   // ── QUERIES ───────────────────────────────────────────────────────────────
 
-  /**
-   * @query getBlogs
-   * Returns all blog posts wrapped in BlogsSuccessResponse or ErrorResponse.
-   */
   @Query(() => BlogsResponse, {
     name: 'getBlogs',
-    description: 'Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse.',
+    description: 'Fetch all blog posts.',
   })
   async getBlogs(): Promise<BlogsResponseType> {
     try {
-      const blogs = this.blogsService.findAll();
+      const blogs = await this.blogsService.findAll();
       return ResponseFactory.blogs(blogs, 'Blog posts retrieved successfully');
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
   }
 
-  /**
-   * @query getBlog
-   * Returns a single blog post wrapped in BlogSuccessResponse or ErrorResponse.
-   */
   @Query(() => BlogResponse, {
     name: 'getBlog',
-    description: 'Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.',
+    description: 'Fetch one blog post by UUID.',
   })
   async getBlog(@Args('input') input: GetBlogArgs): Promise<BlogResponseType> {
     try {
-      const blog = this.blogsService.findOne(input.id);
+      const blog = await this.blogsService.findOne(input.id);
       return ResponseFactory.blog(blog, 'Blog post retrieved successfully');
     } catch (error) {
       return ResponseFactory.fromException(error);
@@ -82,8 +80,9 @@ export class BlogsResolver {
   // ── FIELD RESOLVER ────────────────────────────────────────────────────────
 
   /**
-   * @resolveField author
-   * Returns the federation User reference for each Blog's author.
+   * Returns federation User stub { id: blog.authorId } for every Blog.
+   * Apollo Router resolves the full User from user-service via _entities batch.
+   * N blogs → 1 round-trip to user-service (not N).
    */
   @ResolveField(() => User, {
     description: 'Author resolved from user-service via Apollo Federation _entities',
@@ -94,12 +93,8 @@ export class BlogsResolver {
 
   // ── MUTATIONS ─────────────────────────────────────────────────────────────
 
-  /**
-   * @mutation createBlog
-   * Creates a blog post. Returns BlogResponse.
-   */
   @Mutation(() => BlogResponse, {
-    description: 'Create a new blog post. Emits blog.created Kafka event on success.',
+    description: 'Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.',
   })
   async createBlog(@Args('input') input: CreateBlogInput): Promise<BlogResponseType> {
     try {
@@ -110,10 +105,6 @@ export class BlogsResolver {
     }
   }
 
-  /**
-   * @mutation updateBlog
-   * Partially updates a blog post. Returns BlogResponse.
-   */
   @Mutation(() => BlogResponse, {
     description: 'Partially update a blog post. Emits blog.updated Kafka event.',
   })
@@ -126,10 +117,6 @@ export class BlogsResolver {
     }
   }
 
-  /**
-   * @mutation deleteBlog
-   * Deletes a blog post. Returns BaseApiResponse.
-   */
   @Mutation(() => BaseApiResponse, {
     description: 'Delete a blog post. Emits blog.deleted Kafka event.',
   })
@@ -142,14 +129,52 @@ export class BlogsResolver {
     }
   }
 
-  // ── FEDERATION ────────────────────────────────────────────────────────────
+  // ── SUBSCRIPTIONS ─────────────────────────────────────────────────────────
 
   /**
-   * @resolveReference
-   * Apollo Router entity resolution for Blog.
+   * @subscription blogCreated
+   * Fires when BlogsKafkaController processes a blog.created event.
+   *
+   * Client usage:
+   *   subscription {
+   *     blogCreated { id title content authorId author { id name email } }
+   *   }
    */
+  @Subscription(() => Blog, {
+    description: 'Real-time push when a blog post is created.',
+  })
+  blogCreated() {
+    return this.pubSub.asyncIterator('blogCreated');
+  }
+
+  /**
+   * @subscription blogUpdated
+   * Fires when BlogsKafkaController processes a blog.updated event.
+   */
+  @Subscription(() => Blog, {
+    description: 'Real-time push when a blog post is updated.',
+  })
+  blogUpdated() {
+    return this.pubSub.asyncIterator('blogUpdated');
+  }
+
+  /**
+   * @subscription blogDeleted
+   * Fires when BlogsKafkaController processes a blog.deleted event.
+   * Returns the deleted blog id as a String (the entity no longer exists).
+   */
+  @Subscription(() => String, {
+    description: 'Real-time push when a blog post is deleted. Returns the deleted blog id.',
+    resolve: (payload) => payload.blogDeleted,
+  })
+  blogDeleted() {
+    return this.pubSub.asyncIterator('blogDeleted');
+  }
+
+  // ── FEDERATION ────────────────────────────────────────────────────────────
+
   @ResolveReference()
-  resolveReference(reference: { __typename: string; id: string }): Blog {
+  async resolveReference(reference: { __typename: string; id: string }): Promise<Blog> {
     return this.blogsService.resolveReference(reference);
   }
 }

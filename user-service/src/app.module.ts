@@ -1,75 +1,60 @@
-import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
-import {
-  ApolloFederationDriver,
-  ApolloFederationDriverConfig,
-} from "@nestjs/apollo";
-import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { GraphQLModule } from "@nestjs/graphql";
-import { GraphQLScalarType } from "graphql";
-import { DateTimeResolver } from "graphql-scalars";
-import { UsersModule } from "./users/users.module";
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { GraphQLModule } from '@nestjs/graphql';
+import { GraphQLScalarType } from 'graphql';
+import { DateTimeResolver } from 'graphql-scalars';
+import { UsersModule } from './users/users.module';
 
 /**
- * @module AppModule
- * @description Root module for user-service.
+ * @module AppModule  (user-service)
  *
- * GraphQL configuration
- * ─────────────────────
- * Driver:         ApolloFederationDriver (code-first, Federation v2)
- * autoSchemaFile: true — schema generated from TS decorators at runtime.
- *                 When set to a file path (e.g. './schema.graphql'), NestJS
- *                 writes the SDL to disk — enabling GraphQL Code Generator,
- *                 CI schema linting, and schema diffing in CI pipelines.
- *                 Set to 'schema.graphql' for production; `true` for demos.
+ * Additions vs original
+ * ──────────────────────
+ * subscriptions: graphql-ws transport enabled for GraphQL Subscriptions.
+ *   Clients connect via WebSocket to /graphql and use the graphql-ws protocol.
+ *   Apollo Sandbox supports subscriptions natively.
  *
- * DateTime scalar
- * ───────────────
- * Registered via the `resolvers` option. graphql-scalars provides a
- * Federation-compatible DateTime scalar with RFC 3339 wire format.
- * Must be registered here AND exported via @Scalar or the resolvers map.
+ *   Protocol: graphql-ws (recommended over subscriptions-transport-ws)
+ *   Client lib: graphql-ws  npm install graphql-ws
  *
- * Apollo Router compatibility
- * ───────────────────────────
- * The ApolloFederationDriver serves the SDL at GET /_service so Apollo
- * Router can introspect it at startup without any extra configuration.
+ *   Browser example:
+ *     import { createClient } from 'graphql-ws';
+ *     const client = createClient({ url: 'ws://localhost:4001/graphql' });
+ *     client.subscribe(
+ *       { query: 'subscription { userCreated { id name email } }' },
+ *       { next: (data) => console.log(data) }
+ *     );
+ *
+ * Everything else — driver, federation, DateTime scalar, context — is unchanged.
  */
 @Module({
   imports: [
-    // ── Configuration ───────────────────────────────────────────────────
-    ConfigModule.forRoot({
-      isGlobal: true, // Makes ConfigService available everywhere
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
 
     GraphQLModule.forRoot<ApolloFederationDriverConfig>({
       driver: ApolloFederationDriver,
-
-      // ── Schema generation ────────────────────────────────────────────────
-      // Change to './schema.graphql' to write the SDL to disk.
-      // The generated file is what you commit for GraphQL Code Generator.
       autoSchemaFile: {
-        federation: 2,
-        path: "./schema.graphql", // ← uncomment to persist to disk
+        federation: {
+          version: 2,
+          importUrl: 'https://specs.apollo.dev/federation/v2.4',
+        },
+        path: './schema.graphql',
       },
-
-      // ── Scalar registration ──────────────────────────────────────────────
-      // Maps the 'DateTime' scalar name (used in @Field decorators) to the
-      // graphql-scalars implementation that handles serialisation/parsing.
       resolvers: {
         DateTime: DateTimeResolver as unknown as GraphQLScalarType,
       },
-
-      // ── Dev tooling ──────────────────────────────────────────────────────
       playground: false,
       introspection: true,
-
-      // ── Landing page plugin ───────────────────────────────────────────────
-      // Provides a better local development experience than Apollo Sandbox.
       plugins: [ApolloServerPluginLandingPageLocalDefault()],
 
-      // ── Context forwarding ───────────────────────────────────────────────
-      // Expose the raw HTTP request in the GraphQL context so filters and
-      // guards can access headers (e.g. correlation ID, auth tokens).
+      // ── WebSocket subscriptions (graphql-ws protocol) ─────────────────
+      // NestJS v13.2+ and Apollo Federation v2.4+ support this natively.
+      subscriptions: {
+        'graphql-ws': true,
+      },
+
       context: ({ req }: { req: Request }) => ({ req }),
     }),
 

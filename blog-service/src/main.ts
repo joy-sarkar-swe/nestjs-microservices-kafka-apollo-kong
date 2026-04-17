@@ -1,22 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { GqlValidationFilter } from './common/filters/gql-validation.filter';
 
 /**
  * @bootstrap  (blog-service)
  *
- * Hybrid application:
- *   1. HTTP :3002 — GraphQL subgraph (/graphql) + REST (/blogs/*)
- *   2. Kafka      — consumer group: blog-service-group
+ * Transport layers
+ * ─────────────────
+ * 1. HTTP :4002
+ *    ├─ /graphql        — GraphQL subgraph (Apollo Router + Subscriptions via graphql-ws)
+ *    └─ /blogs/*        — REST (Kong Gateway)
  *
- * GqlValidationFilter registered globally — converts BadRequestException
- * from ValidationPipe into structured ErrorResponse (part of ApiResponse union).
+ * 2. WebSocket :4002 (same port — NestJS multiplexes)
+ *    ├─ /graphql        — graphql-ws subscription transport (GQL clients)
+ *    └─ /blogs          — Socket.IO namespace (REST clients)
+ *
+ * 3. Kafka consumer   — group: blog-service-group
  */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  // ── Socket.IO adapter — required for BlogEventsGateway ────────────────
+  app.useWebSocketAdapter(new IoAdapter(app));
+
+  // ── Kafka consumer ────────────────────────────────────────────────────
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
@@ -28,6 +38,7 @@ async function bootstrap(): Promise<void> {
     },
   });
 
+  // ── Validation pipe ───────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -40,7 +51,9 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // ── GraphQL validation filter ─────────────────────────────────────────
   app.useGlobalFilters(new GqlValidationFilter());
+
   app.enableCors();
 
   await app.startAllMicroservices();
@@ -48,9 +61,11 @@ async function bootstrap(): Promise<void> {
   await app.listen(port);
 
   console.log(`🚀 blog-service running on http://localhost:${port}`);
-  console.log(`   ├─ GraphQL subgraph : http://localhost:${port}/graphql`);
-  console.log(`   └─ REST (Kong)      : http://localhost:${port}/blogs/*`);
-  console.log(`📨 Kafka consumer      : ${process.env.KAFKA_BROKER || 'localhost:9092'} [blog-service-group]`);
+  console.log(`   ├─ GraphQL (HTTP)        : http://localhost:${port}/graphql`);
+  console.log(`   ├─ GraphQL (WS / gql-ws) : ws://localhost:${port}/graphql`);
+  console.log(`   ├─ Socket.IO (/blogs ns)  : ws://localhost:${port}/blogs`);
+  console.log(`   └─ REST (Kong)            : http://localhost:${port}/blogs/*`);
+  console.log(`📨 Kafka consumer            : ${process.env.KAFKA_BROKER || 'localhost:9092'} [blog-service-group]`);
 }
 
 bootstrap();

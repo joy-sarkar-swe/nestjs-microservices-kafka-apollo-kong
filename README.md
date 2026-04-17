@@ -1,272 +1,333 @@
-# NestJS Microservices — Apollo Federation v2 + Kong + Unified Response System
+# NestJS Microservices — Repository Pattern + Pattern B Realtime
 
-> Two NestJS subgraphs (user-service, blog-service) with a unified ApiResponse
-> union, Apollo Router for GraphQL, Kong for REST, and Kafka for async events.
+> Apollo Federation v2 · Kafka Pub/Sub · Repository Pattern · GraphQL Subscriptions · Socket.IO
+
+---
+
+## What changed from the previous version
+
+| Area                   | Before               | After                                                              |
+| ---------------------- | -------------------- | ------------------------------------------------------------------ |
+| **Persistence**        | `Map` inside service | `InMemoryXxxRepository` behind interface                           |
+| **Service dependency** | `new Map()` directly | `@Inject('XXX_REPOSITORY') repo: XxxRepository`                    |
+| **Kafka envelope**     | Raw JSON payload     | Typed `KafkaEvent<T>` with `correlationId`, `version`, `timestamp` |
+| **Idempotency**        | None                 | `processedCorrelationIds: Set<string>` (capped at 10 000)          |
+| **Dead-letter queue**  | None                 | `user.events.dlq` / `blog.events.dlq` topics                       |
+| **GraphQL real-time**  | None                 | 3 `@Subscription` per service via `graphql-ws`                     |
+| **REST real-time**     | None                 | Socket.IO gateway per service (`/users`, `/blogs` namespaces)      |
+| **Controller async**   | Mixed                | All async (repository interface is always async)                   |
 
 ---
 
 ## Architecture
 
 ```
-                         CLIENT
-               ┌──────────┴──────────┐
-            GraphQL                REST
-               │                    │
-               ▼                    ▼
-    ┌─────────────────┐   ┌─────────────────┐
-    │  Apollo Router  │   │  Kong Gateway   │
-    │  (Rust binary)  │   │  (Docker)       │
-    │  :4000          │   │  :8000          │
-    └────────┬────────┘   └────────┬────────┘
-             │ Federation           │ HTTP proxy
-     ┌───────┴───────┐     ┌───────┴───────┐
-     ▼               ▼     ▼               ▼
+                        CLIENT
+              ┌──────────┴─────────┐
+           GraphQL                REST
+              │                    │
+              ▼                    ▼
+   ┌─────────────────┐   ┌─────────────────┐
+   │  Apollo Router  │   │  Kong Gateway   │
+   │  :4000 (GQL)    │   │  :8000 (REST)   │
+   └────────┬────────┘   └────────┬────────┘
+            │ Federation           │
+    ┌───────┴───────┐     ┌───────┴───────┐
+    ▼               ▼     ▼               ▼
 ┌──────────┐   ┌──────────┐ (same services)
 │user-svc  │   │blog-svc  │
-│:3001     │   │:3002     │
-│/graphql  │   │/graphql  │ ← Apollo Router
-│/users/*  │   │/blogs/*  │ ← Kong Gateway
-└────┬─────┘   └────┬─────┘
-     └──────┬────────┘
-            ▼
+│:4001     │   │:4002     │
+│          │   │          │
+│ /graphql ├───┤ /graphql │ ← Apollo Router (HTTP + WS)
+│ /users/* ├───┤ /blogs/* │ ← Kong (REST)
+│ ws:/users├───┤ ws:/blogs│ ← Socket.IO (REST clients)
+└────┬─────┘   └─────┬────┘
+     │               │
+     └───────┬───────┘
+             ▼
     Apache Kafka :9092
+    ┌─────────────────────────┐
+    │ Topics                  │
+    │  user.created           │
+    │  user.updated           │
+    │  user.deleted           │
+    │  blog.created           │
+    │  blog.updated           │
+    │  blog.deleted           │
+    │  user.events.dlq  (DLQ) │
+    │  blog.events.dlq  (DLQ) │
+    └─────────────────────────┘
+```
+
+### Pattern B data flow (per mutation)
+
+```
+1. Client sends mutation / REST request
+2. Service validates via Repository.findByXxx()
+3. Service writes to Repository (InMemory / future: Prisma / TypeORM)
+4. Service publishes KafkaEvent<T> { correlationId, eventType, version, payload }
+5. Service returns the result immediately (response is instant)
+
+── Async (decoupled) ──────────────────────────────────────────────────────
+6. KafkaController receives event on topic
+7. Parses KafkaEvent<T> envelope — validates structure
+8. Checks processedCorrelationIds set (idempotency guard)
+9. GraphQL: pubSub.publish('userCreated', ...) → fires @Subscription
+10. Socket.IO: gateway.emitUserCreated(event) → broadcasts to /users namespace
+11. On error: forwards to user.events.dlq / blog.events.dlq
+12. Marks correlationId as processed
 ```
 
 ---
 
-## Folder Structure
+## Folder structure
 
 ```
-microservices/
-├── docker-compose.yml                    # Infra only: Kafka + Kong
+├── user-service/
+│   ├── src/
+│   │   ├── common/
+│   │   │   ├── filters/        gql-validation.filter.ts
+│   │   │   ├── graphql/        scalars.ts
+│   │   │   ├── kafka/
+│   │   │   │   └── kafka-event.interface.ts  ← NEW: typed envelope
+│   │   │   ├── responses/      (unchanged)
+│   │   │   └── validators/     (unchanged)
+│   │   ├── realtime/
+│   │   │   └── user-events.gateway.ts        ← NEW: Socket.IO /users
+│   │   └── users/
+│   │       ├── repositories/
+│   │       │   ├── user.repository.interface.ts     ← NEW
+│   │       │   └── in-memory-user.repository.ts     ← NEW
+│   │       ├── dto/            (unchanged)
+│   │       ├── entities/       (unchanged)
+│   │       ├── users.service.ts        ← MODIFIED: uses UserRepository
+│   │       ├── users.resolver.ts       ← MODIFIED: async + Subscriptions
+│   │       ├── users.rest.controller.ts ← MODIFIED: all methods async
+│   │       ├── users.kafka.controller.ts ← MODIFIED: idempotency+DLQ+realtime
+│   │       └── users.module.ts          ← MODIFIED: DI tokens wired
+│   ├── app.module.ts    ← MODIFIED: subscriptions: { 'graphql-ws': ... }
+│   └── main.ts          ← MODIFIED: IoAdapter added
 │
-├── user-service/                         # NestJS :3001
-│   ├── schema.graphql                    # ← Authoritative SDL (Code Generator / CI)
+├── blog-service/
 │   └── src/
-│       ├── main.ts                       # Hybrid bootstrap + GqlValidationFilter
-│       ├── app.module.ts                 # GraphQL Federation + DateTime scalar
-│       ├── common/
-│       │   ├── graphql/
-│       │   │   └── scalars.ts            # DateTime scalar re-export
-│       │   ├── responses/
-│       │   │   ├── field-error.type.ts   # FieldError { field message }
-│       │   │   ├── error-response.type.ts# ErrorResponse (400|404|409|500)
-│       │   │   ├── base-response.type.ts # BaseResponse (delete success)
-│       │   │   ├── user-success-response.type.ts  # UserSuccessResponse | UsersSuccessResponse
-│       │   │   ├── api-response.union.ts # union ApiResponse + resolveType
-│       │   │   └── response.factory.ts   # ResponseFactory (centralised builder)
-│       │   ├── validators/
-│       │   │   └── validation.util.ts    # transformValidationErrors()
-│       │   └── filters/
-│       │       └── gql-validation.filter.ts  # BadRequestException → ErrorResponse
-│       └── users/
-│           ├── entities/user.entity.ts   # @ObjectType @key(fields:"id")
-│           ├── dto/user.input.ts         # Create|Update|Delete InputTypes
-│           ├── users.service.ts          # CRUD + Kafka producer (plain User)
-│           ├── users.resolver.ts         # All ops return ApiResponse
-│           ├── users.rest.controller.ts  # REST /users/* (Kong)
-│           ├── users.kafka.controller.ts # Kafka @EventPattern consumers
-│           └── users.module.ts
-│
-├── blog-service/                         # NestJS :3002
-│   ├── schema.graphql                    # ← Authoritative SDL
-│   └── src/
-│       ├── main.ts
-│       ├── app.module.ts
-│       ├── common/                       # Mirror of user-service common/
-│       │   ├── graphql/scalars.ts
-│       │   ├── responses/
-│       │   │   ├── field-error.type.ts
-│       │   │   ├── base-responses.type.ts        # ErrorResponse + BaseResponse
-│       │   │   ├── blog-success-response.type.ts # BlogSuccessResponse | BlogsSuccessResponse
-│       │   │   ├── api-response.union.ts
-│       │   │   └── response.factory.ts
-│       │   ├── validators/validation.util.ts
-│       │   └── filters/gql-validation.filter.ts
+│       ├── common/kafka/
+│       │   └── kafka-event.interface.ts         ← NEW
+│       ├── realtime/
+│       │   └── blog-events.gateway.ts           ← NEW: Socket.IO /blogs
 │       └── blogs/
-│           ├── entities/blog.entity.ts   # Blog @key + User @extends @external
-│           ├── dto/blog.input.ts
-│           ├── blogs.service.ts          # CRUD + Kafka + orphan cleanup
-│           ├── blogs.resolver.ts         # All ops return ApiResponse + @ResolveField author
-│           ├── blogs.rest.controller.ts
-│           ├── blogs.kafka.controller.ts # Handles user.deleted → orphan cleanup
-│           └── blogs.module.ts
+│           ├── repositories/
+│           │   ├── blog.repository.interface.ts ← NEW
+│           │   └── in-memory-blog.repository.ts ← NEW
+│           ├── blogs.service.ts          ← MODIFIED: uses BlogRepository
+│           ├── blogs.resolver.ts         ← MODIFIED: async + Subscriptions
+│           ├── blogs.rest.controller.ts  ← MODIFIED: async
+│           ├── blogs.kafka.controller.ts ← MODIFIED: idempotency+DLQ+realtime
+│           └── blogs.module.ts           ← MODIFIED: DI tokens wired
 │
-├── apollo-router/
-│   ├── supergraph.yaml                   # rover supergraph compose config
-│   └── router.yaml                       # Router runtime config
-│
-└── kong-gateway/
-    └── kong.yml                          # DB-less declarative route config
+├── docker-compose.yml   ← MODIFIED: kafka-init creates DLQ topics
+└── README.md
 ```
 
 ---
 
-## Response System
+## Repository Pattern — how to swap backends
 
-### GraphQL Types Hierarchy
-
-```
-ApiResponse (union)
-├── ErrorResponse          — any failure
-│   ├── statusCode: Int!
-│   ├── success: false
-│   ├── message: String!
-│   ├── errors: [FieldError!]   ← field-level validation failures (400 only)
-│   └── timestamp: DateTime!
-│
-├── BaseResponse           — delete success (no data payload)
-│   ├── statusCode: Int!
-│   ├── success: true
-│   ├── message: String!
-│   └── timestamp: DateTime!
-│
-├── UserSuccessResponse    — single user success
-│   ├── statusCode: Int!
-│   ├── success: true
-│   ├── message: String!
-│   ├── data: User!
-│   └── timestamp: DateTime!
-│
-├── UsersSuccessResponse   — user list success
-│   ├── data: [User!]!
-│   └── ... same base fields
-│
-├── BlogSuccessResponse    — single blog success
-│   ├── data: Blog!        ← Blog.author resolved via Federation
-│   └── ... same base fields
-│
-└── BlogsSuccessResponse   — blog list success
-    ├── data: [Blog!]!     ← each Blog.author resolved via Federation batch
-    └── ... same base fields
-```
-
-### ResponseFactory Usage (inside resolvers)
+### Current (InMemory)
 
 ```typescript
-// Single entity success
-return ResponseFactory.user(
-  user,
-  "User created successfully",
-  HttpStatus.CREATED,
-);
-
-// List success
-return ResponseFactory.users(users, "Users retrieved successfully");
-
-// Delete success
-return ResponseFactory.deleted("User deleted successfully");
-
-// From caught exception (maps status codes automatically)
-return ResponseFactory.fromException(error);
-
-// Manual errors
-return ResponseFactory.notFound('User "abc" not found');
-return ResponseFactory.conflict("Email already registered");
-return ResponseFactory.validationError(fieldErrors);
+// UsersModule providers:
+{ provide: 'USER_REPOSITORY', useClass: InMemoryUserRepository }
 ```
 
-### Validation Flow
+### Future: Prisma
 
+```typescript
+// 1. Create PrismaUserRepository implementing UserRepository
+// 2. Change ONE line in UsersModule:
+{ provide: 'USER_REPOSITORY', useClass: PrismaUserRepository }
+
+// UsersService, UsersResolver, UsersRestController: zero changes.
 ```
-Client sends mutation with invalid input
-        │
-        ▼
-NestJS ValidationPipe runs class-validator
-        │  fails
-        ▼
-BadRequestException({ message: ValidationError[] })
-        │
-        ▼
-GqlValidationFilter.catch()
-        │
-        ▼
-transformValidationErrors()  →  FieldError[]
-        │
-        ▼
-ResponseFactory.validationError(fieldErrors)
-        │
-        ▼
-ErrorResponse { statusCode:400, errors:[{field,message}], timestamp }
-        │
-        ▼
-Apollo returns as resolver result (NOT a raw GraphQL error)
+
+### Future: TypeORM
+
+```typescript
+{ provide: 'USER_REPOSITORY', useClass: TypeOrmUserRepository }
+```
+
+### Future: Mongoose
+
+```typescript
+{ provide: 'USER_REPOSITORY', useClass: MongooseUserRepository }
+```
+
+The `UserRepository` interface is the contract. All current code depends
+on this interface via `@Inject('USER_REPOSITORY')` — never on the concrete class.
+
+---
+
+## Kafka Event Envelope
+
+Every Kafka message is now a typed `KafkaEvent<T>`:
+
+```typescript
+interface KafkaEvent<T> {
+  correlationId: string; // UUID v4 — for idempotency + realtime correlation
+  eventType: string; // mirrors topic name: "user.created"
+  version: number; // schema version — bump on breaking changes
+  timestamp: string; // ISO 8601 — producer-side clock
+  payload: T; // typed domain object
+}
+```
+
+**Wire example** (`user.created`):
+
+```json
+{
+  "correlationId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "eventType": "user.created",
+  "version": 1,
+  "timestamp": "2025-04-17T10:30:00.000Z",
+  "payload": {
+    "id": "b9e8d1a2-...",
+    "name": "Alice Johnson",
+    "email": "alice@example.com"
+  }
+}
 ```
 
 ---
 
-## Setup (No Docker for NestJS)
+## Setup
 
 ### Prerequisites
 
 ```bash
 node --version   # >= 20
 docker --version
-
-# Rover CLI (Apollo schema tool)
 npm install -g @apollo/rover
-
-# Apollo Router binary (run from apollo-router/ dir)
-cd apollo-router
-curl -sSL https://router.apollo.dev/download/nix/latest | sh
+# Apollo Router binary in apollo-router/ directory
 ```
 
-### Step 1 — Start Infrastructure
+### Step 1 — Infrastructure
 
 ```bash
 docker compose up -d
-# Wait 20–30s for Kafka to initialise
-docker compose logs kafka | grep "started (kafka.server.KafkaServer)"
+# kafka-init creates DLQ topics then exits — check with:
+docker compose logs kafka-init
 ```
 
-### Step 2 — Start user-service (Terminal 1)
+### Step 2 — user-service
 
 ```bash
-cd user-service && npm install && npm run start:dev
-# → http://localhost:4001/graphql  (subgraph)
-# → http://localhost:4001/users/*  (REST)
+cd user-service
+npm install
+npm run start:dev
+# http://localhost:4001/graphql
+# ws://localhost:4001/graphql   (graphql-ws subscriptions)
+# ws://localhost:4001/users     (Socket.IO namespace)
 ```
 
-### Step 3 — Start blog-service (Terminal 2)
+### Step 3 — blog-service
 
 ```bash
-cd blog-service && npm install && npm run start:dev
-# → http://localhost:4002/graphql  (subgraph)
-# → http://localhost:4002/blogs/*  (REST)
+cd blog-service
+npm install
+npm run start:dev
+# http://localhost:4002/graphql
+# ws://localhost:4002/graphql   (graphql-ws subscriptions)
+# ws://localhost:4002/blogs     (Socket.IO namespace)
 ```
 
-### Step 4 — Compose supergraph & start Apollo Router (Terminal 3)
+### Step 4 — Apollo Router
 
 ```bash
 cd apollo-router
-curl -sSL https://rover.apollo.dev/nix/latest | sh # for the first-time
 rover supergraph compose --config supergraph.yaml > supergraph.graphql
 ./router --config router.yaml --supergraph supergraph.graphql
-# → http://localhost:4000  (GraphQL unified entry point)
-```
-
-### Step 5 — Verify Kong
-
-```bash
-curl http://localhost:8001/services | jq .   # lists user-service, blog-service
-curl http://localhost:8001/routes   | jq .   # lists all 4 routes
+# http://localhost:4000
 ```
 
 ---
 
-## Testing — GraphQL via Apollo Router (:4000)
+## GraphQL Subscriptions
 
-### createUser — success response
+Connect via `graphql-ws` protocol. Open Apollo Sandbox at `http://localhost:4001`
+or `http://localhost:4002` and use the subscription panel:
+
+### Subscribe to user events
+
+```graphql
+# Terminal 1 — subscribe before mutating
+subscription {
+  userCreated {
+    id
+    name
+    email
+  }
+}
+
+subscription {
+  userUpdated {
+    id
+    name
+    email
+  }
+}
+
+subscription {
+  userDeleted # returns the deleted user id as String
+}
+```
+
+### Subscribe to blog events
+
+```graphql
+subscription {
+  blogCreated {
+    id
+    title
+    content
+    authorId
+  }
+}
+
+subscription {
+  blogUpdated {
+    id
+    title
+    content
+  }
+}
+
+subscription {
+  blogDeleted # returns the deleted blog id as String
+}
+```
+
+### Full flow demo (two terminals)
+
+**Terminal A — Subscribe:**
+
+```graphql
+subscription {
+  userCreated {
+    id
+    name
+    email
+  }
+}
+```
+
+**Terminal B — Mutate:**
 
 ```graphql
 mutation {
-  createUser(input: { name: "Alice Johnson", email: "alice@example.com" }) {
+  createUser(input: { name: "Alice", email: "alice@example.com" }) {
     __typename
     ... on UserSuccessResponse {
       statusCode
-      success
       message
-      timestamp
       data {
         id
         name
@@ -275,292 +336,117 @@ mutation {
     }
     ... on ErrorResponse {
       statusCode
-      success
-      message
-      timestamp
-      errors {
-        field
-        message
-      }
-    }
-  }
-}
-```
-
-**Response (201 success):**
-
-```json
-{
-  "data": {
-    "createUser": {
-      "__typename": "UserSuccessResponse",
-      "statusCode": 201,
-      "success": true,
-      "message": "User created successfully",
-      "timestamp": "2025-04-16T10:30:00.000Z",
-      "data": {
-        "id": "uuid-here",
-        "name": "Alice Johnson",
-        "email": "alice@example.com"
-      }
-    }
-  }
-}
-```
-
-### createUser — validation error (empty name)
-
-```graphql
-mutation {
-  createUser(input: { name: "", email: "not-an-email" }) {
-    __typename
-    ... on ErrorResponse {
-      statusCode
-      success
-      message
-      timestamp
-      errors {
-        field
-        message
-      }
-    }
-  }
-}
-```
-
-**Response (400 validation):**
-
-```json
-{
-  "data": {
-    "createUser": {
-      "__typename": "ErrorResponse",
-      "statusCode": 400,
-      "success": false,
-      "message": "Validation failed",
-      "timestamp": "2025-04-16T10:30:00.000Z",
-      "errors": [
-        { "field": "name", "message": "name must not be empty" },
-        { "field": "name", "message": "name must be at least 2 characters" },
-        { "field": "email", "message": "email must be a valid email address" }
-      ]
-    }
-  }
-}
-```
-
-### createUser — conflict error (duplicate email)
-
-**Response (409 conflict):**
-
-```json
-{
-  "data": {
-    "createUser": {
-      "__typename": "ErrorResponse",
-      "statusCode": 409,
-      "success": false,
-      "message": "Email \"alice@example.com\" is already registered",
-      "timestamp": "2025-04-16T10:30:00.000Z",
-      "errors": null
-    }
-  }
-}
-```
-
-### createBlog with cross-service author resolution
-
-```graphql
-mutation {
-  createBlog(
-    input: {
-      title: "My First Post"
-      content: "Hello from blog-service via Apollo Federation!"
-      authorId: "PASTE-USER-UUID"
-    }
-  ) {
-    __typename
-    ... on BlogSuccessResponse {
-      statusCode
-      success
-      message
-      timestamp
-      data {
-        id
-        title
-        content
-        authorId
-        author {
-          id
-          name
-          email
-        }
-      }
-    }
-    ... on ErrorResponse {
-      statusCode
       message
       errors {
         field
         message
       }
-      timestamp
     }
   }
 }
 ```
 
-### getBlogs — list with per-blog author resolution
+**What happens:**
 
-```graphql
-query {
-  getBlogs {
-    __typename
-    ... on BlogsSuccessResponse {
-      statusCode
-      success
-      message
-      timestamp
-      data {
-        id
-        title
-        content
-        authorId
-        author {
-          id
-          name
-          email
-        }
-      }
-    }
-    ... on ErrorResponse {
-      statusCode
-      message
-      timestamp
-    }
-  }
+1. Mutation returns immediately with the created user
+2. `UsersService.publish()` emits `KafkaEvent<User>` to `user.created` topic
+3. `UsersKafkaController.handleUserCreated()` consumes the event
+4. `pubSub.publish('userCreated', ...)` fires the subscription
+5. Terminal A receives `{ data: { userCreated: { id, name, email } } }`
+
+---
+
+## Socket.IO (REST clients)
+
+```javascript
+// user-service
+const { io } = require("socket.io-client");
+const socket = io("http://localhost:4001/users");
+
+socket.on("connect", () => console.log("Connected to user-service"));
+socket.on("user:created", (event) => console.log("New user:", event.payload));
+socket.on("user:updated", (event) =>
+  console.log("Updated user:", event.payload),
+);
+socket.on("user:deleted", (event) =>
+  console.log("Deleted user id:", event.payload.id),
+);
+```
+
+```javascript
+// blog-service
+const socket = io("http://localhost:4002/blogs");
+socket.on("blog:created", (event) => console.log("New blog:", event.payload));
+socket.on("blog:updated", (event) =>
+  console.log("Updated blog:", event.payload),
+);
+socket.on("blog:deleted", (event) =>
+  console.log("Deleted blog id:", event.payload.id),
+);
+```
+
+The `event` object is the full `KafkaEvent<T>` envelope — clients get
+`correlationId` so they can match the push back to the mutation that triggered it:
+
+```javascript
+// Client-side correlation
+const pendingMutations = new Map();
+
+// When you mutate, save a callback keyed by correlationId:
+//   (correlationId is not exposed at GraphQL level in this demo,
+//    but it IS in the Socket.IO event envelope)
+socket.on("user:created", ({ correlationId, payload }) => {
+  const callback = pendingMutations.get(correlationId);
+  if (callback) callback(payload);
+});
+```
+
+---
+
+## Dead Letter Queue
+
+Failed consumer messages go to:
+
+- `user.events.dlq` — user-service consumer failures
+- `blog.events.dlq` — blog-service consumer failures
+
+Inspect via Kafka UI at `http://localhost:8080`.
+
+DLQ message shape:
+
+```json
+{
+  "originalTopic": "user.created",
+  "originalPayload": { "...raw kafka message..." },
+  "error": "Some error message",
+  "partition": 0,
+  "timestamp": "2025-04-17T10:30:00.000Z"
 }
 ```
 
-> Apollo Router batches ALL author lookups across the entire list into a single
-> `_entities` request to user-service — one round-trip for 1000 blogs.
+To replay: consume from the DLQ and re-publish to the original topic
+after fixing the root cause.
 
-### deleteUser — triggers Kafka orphan cleanup
+---
 
-```graphql
-mutation {
-  deleteUser(input: { id: "PASTE-UUID" }) {
-    __typename
-    ... on BaseResponse {
-      statusCode
-      success
-      message
-      timestamp
-    }
-    ... on ErrorResponse {
-      statusCode
-      message
-      timestamp
-    }
-  }
+## Multi-instance deployments
+
+| Component         | Current                 | Production upgrade                               |
+| ----------------- | ----------------------- | ------------------------------------------------ |
+| PubSub            | In-process `PubSub`     | `RedisPubSub` from `graphql-redis-subscriptions` |
+| Idempotency store | In-process `Set`        | Redis SET with TTL                               |
+| Repository        | `InMemoryXxxRepository` | `PrismaXxxRepository` / `TypeOrmXxxRepository`   |
+
+To upgrade PubSub to Redis — change ONE line in UsersModule/BlogsModule:
+
+```typescript
+{
+  provide: 'GQL_PUB_SUB',
+  useFactory: () => new RedisPubSub({
+    publisher:  new Redis({ host: 'redis', port: 6379 }),
+    subscriber: new Redis({ host: 'redis', port: 6379 }),
+  }),
 }
 ```
 
----
-
-## Testing — REST via Kong (:8000)
-
-```bash
-# Create user
-curl -s -X POST http://localhost:8000/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Alice","email":"alice@example.com"}' | jq .
-
-# Get all users
-curl -s http://localhost:8000/users | jq .
-
-# Get one user
-curl -s http://localhost:8000/users/PASTE-UUID | jq .
-
-# Update user
-curl -s -X PUT http://localhost:8000/users/PASTE-UUID \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Alice Updated"}' | jq .
-
-# Create blog
-curl -s -X POST http://localhost:8000/blogs \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Hello World","content":"My first REST blog post.","authorId":"PASTE-UUID"}' | jq .
-
-# Get all blogs
-curl -s http://localhost:8000/blogs | jq .
-
-# Delete user (triggers user.deleted Kafka → blog-service removes orphaned posts)
-curl -s -X DELETE http://localhost:8000/users/PASTE-UUID | jq .
-
-# Verify blogs cleaned up
-curl -s http://localhost:8000/blogs | jq .
-```
-
----
-
-## GraphQL Code Generator Setup
-
-```bash
-npm install -D @graphql-codegen/cli \
-  @graphql-codegen/typescript \
-  @graphql-codegen/typescript-operations
-
-# codegen.yml (place in project root):
-overwrite: true
-schema:
-  - user-service/schema.graphql
-  - blog-service/schema.graphql
-generates:
-  ./generated/types.ts:
-    plugins:
-      - typescript
-      - typescript-operations
-
-# Run:
-npx graphql-codegen
-```
-
----
-
-## Kafka Topics
-
-| Topic          | Emitted by   | Consumed by                   | Effect                              |
-| -------------- | ------------ | ----------------------------- | ----------------------------------- |
-| `user.created` | user-service | user-service, blog-service    | Observability hooks                 |
-| `user.updated` | user-service | user-service, blog-service    | Cache invalidation hooks            |
-| `user.deleted` | user-service | user-service, blog-service ⚡ | blog-service removes orphaned posts |
-| `blog.created` | blog-service | blog-service                  | Search index / analytics hooks      |
-| `blog.updated` | blog-service | blog-service                  | CDN purge hooks                     |
-| `blog.deleted` | blog-service | blog-service                  | Search removal / cleanup hooks      |
-
----
-
-## Troubleshooting
-
-**`rover supergraph compose` fails**
-→ All services must be running before composing.
-
-**Apollo Router can't reach subgraphs**
-→ Verify services are still running on http://localhost:4001 and http://localhost:\*.
-
-**Kong returns 404**
-
-```bash
-curl http://localhost:8001/routes | jq .   # verify routes loaded
-docker compose restart kong
-```
-
-**`host.docker.internal` not resolving (Linux)**
-→ Add `--add-host=host.docker.internal:host-gateway` to the Kong container,
-or use the `extra_hosts` key (already set in docker-compose.yml).
-
-**Validation errors NOT appearing as ErrorResponse**
-→ Ensure `GqlValidationFilter` is registered in `main.ts` via `app.useGlobalFilters()`.
-→ Ensure `ValidationPipe.exceptionFactory` returns `new BadRequestException(errors)`
-(passing the raw ValidationError[], not a string).
+No other changes needed anywhere.

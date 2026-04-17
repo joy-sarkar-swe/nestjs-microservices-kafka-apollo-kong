@@ -1,62 +1,56 @@
-import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
-import {
-  ApolloFederationDriver,
-  ApolloFederationDriverConfig,
-} from "@nestjs/apollo";
-import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { GraphQLModule } from "@nestjs/graphql";
-import { GraphQLScalarType } from "graphql";
-import { DateTimeResolver } from "graphql-scalars";
-import { BlogsModule } from "./blogs/blogs.module";
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
+import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { GraphQLModule } from '@nestjs/graphql';
+import { GraphQLScalarType } from 'graphql';
+import { DateTimeResolver } from 'graphql-scalars';
+import { BlogsModule } from './blogs/blogs.module';
 
 /**
  * @module AppModule  (blog-service)
  *
- * GraphQL: ApolloFederationDriver, code-first, Federation v2.
- *   autoSchemaFile generates the subgraph SDL at runtime.
- *   Apollo Router introspects this SDL via GET /_service.
- *   Set path: './schema.graphql' to persist SDL to disk for Code Generator.
+ * Additions vs original
+ * ──────────────────────
+ * subscriptions: graphql-ws transport enabled for GraphQL Subscriptions.
+ *   Clients connect to ws://localhost:4002/graphql using the graphql-ws protocol.
  *
- * DateTime scalar: registered via graphql-scalars DateTimeResolver.
- *   Required for all timestamp fields in the response system.
+ *   Browser subscription example:
+ *     import { createClient } from 'graphql-ws';
+ *     const client = createClient({ url: 'ws://localhost:4002/graphql' });
+ *     client.subscribe(
+ *       { query: 'subscription { blogCreated { id title content authorId } }' },
+ *       { next: (data) => console.log(data) }
+ *     );
+ *
+ * Everything else unchanged from original.
  */
 @Module({
   imports: [
-    // ── Configuration ───────────────────────────────────────────────────
-    ConfigModule.forRoot({
-      isGlobal: true, // Makes ConfigService available everywhere
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
 
     GraphQLModule.forRoot<ApolloFederationDriverConfig>({
       driver: ApolloFederationDriver,
-
-      // ── Schema generation ────────────────────────────────────────────────
-      // Change to './schema.graphql' to write the SDL to disk.
-      // The generated file is what you commit for GraphQL Code Generator.
       autoSchemaFile: {
-        federation: 2,
-        path: "./schema.graphql", // ← uncomment to persist to disk
+        federation: {
+          version: 2,
+          importUrl: 'https://specs.apollo.dev/federation/v2.4',
+        },
+        path: './schema.graphql',
       },
-
-      // ── Scalar registration ──────────────────────────────────────────────
-      // Maps the 'DateTime' scalar name (used in @Field decorators) to the
-      // graphql-scalars implementation that handles serialisation/parsing.
       resolvers: {
         DateTime: DateTimeResolver as unknown as GraphQLScalarType,
       },
-
-      // ── Dev tooling ──────────────────────────────────────────────────────
       playground: false,
       introspection: true,
-
-      // ── Landing page plugin ───────────────────────────────────────────────
-      // Provides a better local development experience than Apollo Sandbox.
       plugins: [ApolloServerPluginLandingPageLocalDefault()],
 
-      // ── Context forwarding ───────────────────────────────────────────────
-      // Expose the raw HTTP request in the GraphQL context so filters and
-      // guards can access headers (e.g. correlation ID, auth tokens).
+      // ── WebSocket subscriptions (graphql-ws protocol) ─────────────────
+      // NestJS v13.2+ and Apollo Federation v2.4+ support this natively.
+      subscriptions: {
+        'graphql-ws': true,
+      },
+
       context: ({ req }: { req: Request }) => ({ req }),
     }),
 

@@ -1,66 +1,63 @@
-import { ValidationPipe } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { AppModule } from "./app.module";
-import { GqlValidationFilter } from "./common/filters/gql-validation.filter";
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { AppModule } from './app.module';
+import { GqlValidationFilter } from './common/filters/gql-validation.filter';
 
 /**
- * @bootstrap
- * @description Entry point for user-service.
+ * @bootstrap  (user-service)
  *
- * Hybrid application:
- *   1. HTTP :3001  — GraphQL subgraph (/graphql) + REST (/users/*)
- *   2. Kafka       — consumer group: user-service-group
+ * Transport layers
+ * ─────────────────
+ * 1. HTTP :4001
+ *    ├─ /graphql        — GraphQL subgraph (Apollo Router + Subscriptions via graphql-ws)
+ *    └─ /users/*        — REST (Kong Gateway)
  *
- * Global pipes & filters
- * ──────────────────────
- * ValidationPipe  — runs class-validator on all @Args and @Body inputs.
- *                   On failure it throws BadRequestException.
- * GqlValidationFilter — catches BadRequestException in GraphQL context,
- *                   converts it to ErrorResponse via ResponseFactory,
- *                   and returns it as the resolver result (not a raw error).
+ * 2. WebSocket :4001 (same port — NestJS multiplexes)
+ *    ├─ /graphql        — graphql-ws subscription transport (GQL clients)
+ *    └─ /users          — Socket.IO namespace (REST clients)
  *
- * Why register the filter globally here and not per-resolver?
- * ───────────────────────────────────────────────────────────
- * Registering once in main.ts guarantees it applies to every resolver
- * without per-resolver boilerplate. A missed @UseFilters() decorator
- * would mean some resolvers return raw errors — a production bug.
+ * 3. Kafka consumer   — group: user-service-group
+ *
+ * IoAdapter
+ * ──────────
+ * Swapping from the default WsAdapter to IoAdapter enables Socket.IO.
+ * NestJS uses Socket.IO for @WebSocketGateway decorators.
+ * graphql-ws is handled by the Apollo driver independently.
  */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // ── Kafka consumer ─────────────────────────────────────────────────────
+  // ── Socket.IO adapter — required for UserEventsGateway ────────────────
+  app.useWebSocketAdapter(new IoAdapter(app));
+
+  // ── Kafka consumer ────────────────────────────────────────────────────
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: "user-service",
-        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
+        clientId: 'user-service',
+        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
       },
-      consumer: { groupId: "user-service-group" },
+      consumer: { groupId: 'user-service-group' },
     },
   });
 
-  // ── Validation pipe ────────────────────────────────────────────────────
-  // exceptionFactory is set to return the raw ValidationError[] array so
-  // GqlValidationFilter can transform it into typed FieldError objects.
+  // ── Validation pipe ───────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      // Return structured ValidationError[] instead of plain string messages
-      // so GqlValidationFilter can extract field-level details.
       exceptionFactory: (errors) => {
-        const { BadRequestException } = require("@nestjs/common");
+        const { BadRequestException } = require('@nestjs/common');
         return new BadRequestException(errors);
       },
     }),
   );
 
-  // ── Global GraphQL validation filter ──────────────────────────────────
-  // Intercepts BadRequestException in GraphQL context and converts it to
-  // a structured ErrorResponse (part of the ApiResponse union).
+  // ── GraphQL validation filter ─────────────────────────────────────────
   app.useGlobalFilters(new GqlValidationFilter());
 
   app.enableCors();
@@ -70,11 +67,11 @@ async function bootstrap(): Promise<void> {
   await app.listen(port);
 
   console.log(`🚀 user-service running on http://localhost:${port}`);
-  console.log(`   ├─ GraphQL subgraph : http://localhost:${port}/graphql`);
-  console.log(`   └─ REST (Kong)      : http://localhost:${port}/users/*`);
-  console.log(
-    `📨 Kafka consumer      : ${process.env.KAFKA_BROKER || "localhost:9092"} [user-service-group]`,
-  );
+  console.log(`   ├─ GraphQL (HTTP)        : http://localhost:${port}/graphql`);
+  console.log(`   ├─ GraphQL (WS / gql-ws) : ws://localhost:${port}/graphql`);
+  console.log(`   ├─ Socket.IO (/users ns)  : ws://localhost:${port}/users`);
+  console.log(`   └─ REST (Kong)            : http://localhost:${port}/users/*`);
+  console.log(`📨 Kafka consumer            : ${process.env.KAFKA_BROKER || 'localhost:9092'} [user-service-group]`);
 }
 
 bootstrap();

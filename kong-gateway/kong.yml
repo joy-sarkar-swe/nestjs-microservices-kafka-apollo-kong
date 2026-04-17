@@ -7,8 +7,8 @@
 # Each service exposes both /graphql (for Apollo Router) and REST routes (for Kong).
 #
 # Kong architecture:
-#   Client → Kong :8000 → user-service :3001 /users/*
-#                       → blog-service :3002 /blogs/*
+#   Client → Kong :8000 → user-service :4001 /users/*
+#                       → blog-service :4002 /blogs/*
 #
 # Run Kong:
 #   docker run -d --name kong \
@@ -23,11 +23,10 @@
 #     kong:3.9
 # =============================================================================
 
-_format_version: '3.0'
+_format_version: "3.0"
 _transform: true
 
 services:
-
   # ── user-service upstream ──────────────────────────────────────────────────
   - name: user-service
     url: http://host.docker.internal:4001
@@ -36,12 +35,12 @@ services:
     write_timeout: 30000
     retries: 3
     routes:
-      - name: users-collection       # GET /users, POST /users
+      - name: users-collection # GET /users, POST /users
         methods: [GET, POST]
         paths: [/users]
         strip_path: false
 
-      - name: users-by-id            # GET|PUT|DELETE /users/:id
+      - name: users-by-id # GET|PUT|DELETE /users/:id
         methods: [GET, PUT, DELETE]
         paths:
           - ~/users/(?<id>[^/]+)$
@@ -55,12 +54,12 @@ services:
     write_timeout: 30000
     retries: 3
     routes:
-      - name: blogs-collection       # GET /blogs, POST /blogs
+      - name: blogs-collection # GET /blogs, POST /blogs
         methods: [GET, POST]
         paths: [/blogs]
         strip_path: false
 
-      - name: blogs-by-id            # GET|PUT|DELETE /blogs/:id
+      - name: blogs-by-id # GET|PUT|DELETE /blogs/:id
         methods: [GET, PUT, DELETE]
         paths:
           - ~/blogs/(?<id>[^/]+)$

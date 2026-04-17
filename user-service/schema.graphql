@@ -24,12 +24,10 @@ type FieldError {
 }
 
 type Query {
-  """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
+  """Fetch all users."""
   getUsers: UsersResponse!
 
-  """
-  Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
-  """
+  """Fetch a single user by UUID."""
   getUser(input: GetUserArgs!): UserResponse!
 }
 
@@ -98,10 +96,12 @@ input GetUserArgs {
 }
 
 type Mutation {
-  """Create a new user. Emits user.created Kafka event on success."""
+  """
+  Create a new user. Emits user.created Kafka event. Subscribers receive push once Kafka consumer fires.
+  """
   createUser(input: CreateUserInput!): UserResponse!
 
-  """Partially update an existing user. Emits user.updated Kafka event."""
+  """Partially update a user. Emits user.updated Kafka event."""
   updateUser(input: UpdateUserInput!): UserResponse!
 
   """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
@@ -151,4 +151,17 @@ type BaseResponse {
 input DeleteUserInput {
   """UUID of the user to delete"""
   id: ID!
+}
+
+type Subscription {
+  """
+  Real-time push when a user is created (fires after Kafka consumer processes the event).
+  """
+  userCreated: User!
+
+  """Real-time push when a user is updated."""
+  userUpdated: User!
+
+  """Real-time push when a user is deleted. Returns the deleted user id."""
+  userDeleted: String!
 }

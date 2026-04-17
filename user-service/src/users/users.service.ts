@@ -3,37 +3,50 @@ import {
   NotFoundException,
   ConflictException,
   OnModuleInit,
+  Inject,
 } from '@nestjs/common';
 import { Client, ClientKafka, Transport } from '@nestjs/microservices';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './entities/user.entity';
 import { CreateUserInput, UpdateUserInput, DeleteUserInput } from './dto/user.input';
+import { UserRepository } from './repositories/user.repository.interface';
+import { KafkaEvent } from '../common/kafka/kafka-event.interface';
 
 /**
  * @service UsersService
- * @description Core business logic for user CRUD.
+ * @description Orchestrates user CRUD operations.
+ *
+ * Dependency Inversion
+ * ─────────────────────
+ * This service depends on the `UserRepository` INTERFACE, not any concrete
+ * implementation. It has zero knowledge of Maps, Prisma, TypeORM, or Mongoose.
+ * Swapping the storage backend is a single-line change in UsersModule.
  *
  * Responsibility boundary
- * -----------------------
- * This service operates on plain domain objects (User).
- * It throws NestJS HTTP exceptions (NotFoundException, ConflictException)
- * on failure — it does NOT construct ApiResponse objects.
- * Response wrapping is the resolver's responsibility via ResponseFactory.
+ * ─────────────────────────
+ * 1. Validate business rules (uniqueness, existence)
+ * 2. Delegate storage to UserRepository
+ * 3. Publish typed KafkaEvent<T> envelopes after every mutation
+ * 4. Return plain domain objects — response wrapping is the resolver's job
  *
- * This separation keeps the service layer:
- *   • Testable independently of GraphQL
- *   • Reusable from REST controllers
- *   • Free of presentation-layer concerns
+ * Kafka events
+ * ─────────────
+ * Every mutation emits a KafkaEvent envelope with:
+ *   - correlationId (UUID v4, generated here — one per operation)
+ *   - eventType     (mirrors topic name)
+ *   - version       (schema version, start at 1)
+ *   - timestamp     (ISO 8601, producer-side clock)
+ *   - payload       (typed domain object)
  *
- * Storage:  in-memory Map<UUID, User>
- * Events:   Kafka producer — user.created | user.updated | user.deleted
+ * The consumer layer (UsersKafkaController + RealtimeGateway) uses the
+ * correlationId to push real-time updates to connected clients.
  */
 @Injectable()
 export class UsersService implements OnModuleInit {
   /**
-   * @property kafkaClient
-   * Inline Kafka producer client.
-   * allowAutoTopicCreation avoids manual topic pre-creation in dev.
+   * Kafka producer client.
+   * Producer config: allowAutoTopicCreation ensures topics are created
+   * on first emit without manual CLI setup.
    */
   @Client({
     transport: Transport.KAFKA,
@@ -49,33 +62,31 @@ export class UsersService implements OnModuleInit {
   })
   private kafkaClient: ClientKafka;
 
-  /** In-memory store — keyed by UUID. */
-  private readonly users: Map<string, User> = new Map();
-
   /**
-   * @lifecycle onModuleInit
-   * Connect the Kafka producer before the first request arrives.
+   * @param repo - Injected via 'USER_REPOSITORY' token.
+   * The concrete class is determined by UsersModule providers — this service
+   * never imports InMemoryUserRepository or any DB-specific class.
    */
+  constructor(
+    @Inject('USER_REPOSITORY')
+    private readonly repo: UserRepository,
+  ) {}
+
   async onModuleInit(): Promise<void> {
     await this.kafkaClient.connect();
   }
 
   // ── READ ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Returns all users.
-   * @returns {User[]} Possibly empty array.
-   */
-  findAll(): User[] {
-    return Array.from(this.users.values());
+  async findAll(): Promise<User[]> {
+    return this.repo.findAll();
   }
 
   /**
-   * Returns a single user by UUID.
-   * @throws {NotFoundException} 404 when id is not found.
+   * @throws {NotFoundException} 404 when no user exists with the given id.
    */
-  findOne(id: string): User {
-    const user = this.users.get(id);
+  async findOne(id: string): Promise<User> {
+    const user = await this.repo.findById(id);
     if (!user) {
       throw new NotFoundException(`User with id "${id}" was not found`);
     }
@@ -85,20 +96,13 @@ export class UsersService implements OnModuleInit {
   // ── CREATE ────────────────────────────────────────────────────────────────
 
   /**
-   * Creates a new user and emits `user.created` on Kafka.
-   *
+   * Flow: guard email uniqueness → build entity → persist → emit → return
    * @throws {ConflictException} 409 when email is already registered.
-   *
-   * Flow: guard → build → persist → emit → return
    */
   async create(input: CreateUserInput): Promise<User> {
-    const emailExists = Array.from(this.users.values()).some(
-      (u) => u.email === input.email,
-    );
-    if (emailExists) {
-      throw new ConflictException(
-        `Email "${input.email}" is already registered`,
-      );
+    const existing = await this.repo.findByEmail(input.email);
+    if (existing) {
+      throw new ConflictException(`Email "${input.email}" is already registered`);
     }
 
     const user: User = {
@@ -107,86 +111,90 @@ export class UsersService implements OnModuleInit {
       email: input.email,
     };
 
-    this.users.set(user.id, user);
-    this.publish('user.created', user);
-    return user;
+    const saved = await this.repo.create(user);
+
+    this.publish<User>('user.created', saved);
+    return saved;
   }
 
   // ── UPDATE ────────────────────────────────────────────────────────────────
 
   /**
-   * Partially updates a user and emits `user.updated` on Kafka.
-   *
+   * Flow: resolve existing → guard email uniqueness → persist → emit → return
    * @throws {NotFoundException}  404 when id is not found.
    * @throws {ConflictException}  409 when new email is already taken.
-   *
-   * Flow: resolve → guard → merge → persist → emit → return
    */
   async update(input: UpdateUserInput): Promise<User> {
-    const existing = this.findOne(input.id); // throws 404
+    const existing = await this.findOne(input.id); // throws 404
 
     if (input.email && input.email !== existing.email) {
-      const emailTaken = Array.from(this.users.values()).some(
-        (u) => u.email === input.email && u.id !== input.id,
-      );
-      if (emailTaken) {
-        throw new ConflictException(
-          `Email "${input.email}" is already registered`,
-        );
+      const emailOwner = await this.repo.findByEmail(input.email);
+      if (emailOwner && emailOwner.id !== input.id) {
+        throw new ConflictException(`Email "${input.email}" is already registered`);
       }
     }
 
-    const updated: User = {
-      ...existing,
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.email !== undefined && { email: input.email }),
-    };
+    const patch: Partial<Pick<User, 'name' | 'email'>> = {};
+    if (input.name  !== undefined) patch.name  = input.name;
+    if (input.email !== undefined) patch.email = input.email;
 
-    this.users.set(updated.id, updated);
-    this.publish('user.updated', updated);
+    const updated = await this.repo.update(input.id, patch);
+
+    this.publish<User>('user.updated', updated);
     return updated;
   }
 
   // ── DELETE ────────────────────────────────────────────────────────────────
 
   /**
-   * Removes a user and emits `user.deleted` on Kafka.
-   * blog-service listens to `user.deleted` and removes orphaned posts.
-   *
+   * Flow: verify existence → delete → emit
    * @throws {NotFoundException} 404 when id is not found.
    */
   async delete(input: DeleteUserInput): Promise<void> {
-    this.findOne(input.id); // throws 404
-    this.users.delete(input.id);
-    this.publish('user.deleted', { id: input.id });
+    await this.findOne(input.id); // throws 404
+    await this.repo.delete(input.id);
+    this.publish<{ id: string }>('user.deleted', { id: input.id });
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
   /**
-   * Apollo Federation entity resolver.
-   * Called by Apollo Router when blog-service returns a User { id } reference
-   * and the client requests additional User fields.
-   *
-   * @param {{ id: string }} reference - Minimal entity reference from Router.
-   * @returns {User} Fully populated User record.
-   * @throws {NotFoundException} If the referenced user no longer exists.
+   * Called by Apollo Router for cross-service entity resolution.
+   * Returns raw User — no response wrapping.
    */
-  resolveReference(reference: { id: string }): User {
+  async resolveReference(reference: { id: string }): Promise<User> {
     return this.findOne(reference.id);
   }
 
   // ── KAFKA ─────────────────────────────────────────────────────────────────
 
   /**
-   * Fire-and-forget Kafka event emission.
-   * Uses entity id as the message key for consistent partition routing.
+   * @method publish
+   * Wraps payload in a KafkaEvent envelope and emits fire-and-forget.
+   *
+   * Envelope fields:
+   *   correlationId — fresh UUID per call; consumers use this for idempotency
+   *                   and to push realtime notifications back to the right client
+   *   eventType     — mirrors the topic name exactly
+   *   version       — schema version; bump on breaking payload changes
+   *   timestamp     — producer-side ISO 8601 clock
+   *   payload       — typed domain object
+   *
+   * Kafka message key = entity id → consistent partition routing,
+   * ensuring all events for the same entity are ordered on the same partition.
    */
-  private publish(topic: string, payload: object): void {
-    const key = (payload as any).id ?? 'unknown';
+  private publish<T extends { id?: string }>(topic: string, payload: T): void {
+    const event: KafkaEvent<T> = {
+      correlationId: uuidv4(),
+      eventType:     topic,
+      version:       1,
+      timestamp:     new Date().toISOString(),
+      payload,
+    };
+
     this.kafkaClient.emit(topic, {
-      key,
-      value: JSON.stringify(payload),
+      key:   (payload as any).id ?? 'unknown',
+      value: JSON.stringify(event),
     });
   }
 }

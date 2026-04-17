@@ -1,11 +1,24 @@
 version: "3.9"
 
 # =============================================================================
-# Infrastructure Only — Kafka + Kong
+# Infrastructure — Kafka + Kong
 # NestJS services and Apollo Router run as host processes (no Docker).
+# =============================================================================
+#
+# New in this revision
+# ─────────────────────
+# kafka-init  — one-shot container that pre-creates DLQ topics before services
+#               start. Without this, DLQ topics are auto-created on first write,
+#               but pre-creating lets you set retention, replication, etc.
+#
+# DLQ topics created
+#   user.events.dlq  — failed user-service Kafka consumer messages
+#   blog.events.dlq  — failed blog-service Kafka consumer messages
 # =============================================================================
 
 services:
+
+  # ── Zookeeper ──────────────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
     container_name: zookeeper
@@ -16,6 +29,7 @@ services:
     ports: ["2181:2181"]
     networks: [infra-net]
 
+  # ── Kafka Broker ───────────────────────────────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.8.0
     container_name: kafka
@@ -34,7 +48,47 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LOG_RETENTION_HOURS: 24
     networks: [infra-net]
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
+  # ── Kafka Topic Initialiser (DLQ topics) ──────────────────────────────────
+  # Runs once, creates DLQ topics with explicit retention, then exits.
+  # Services may auto-create topics too (allowAutoTopicCreation: true) but
+  # pre-creating DLQs here ensures correct retention/replication settings.
+  kafka-init:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [infra-net]
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      echo 'Waiting for Kafka...'
+      sleep 5
+
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic user.events.dlq \
+        --partitions 1 \
+        --replication-factor 1 \
+        --config retention.ms=604800000
+
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+        --topic blog.events.dlq \
+        --partitions 1 \
+        --replication-factor 1 \
+        --config retention.ms=604800000
+
+      echo 'DLQ topics created.'
+      "
+    restart: "no"
+
+  # ── Kafka UI ───────────────────────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -46,6 +100,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     networks: [infra-net]
 
+  # ── Kong API Gateway (DB-less) ─────────────────────────────────────────────
   kong:
     image: kong:3.9
     container_name: kong

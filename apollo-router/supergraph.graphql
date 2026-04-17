@@ -4,6 +4,7 @@ schema
 {
   query: Query
   mutation: Mutation
+  subscription: Subscription
 }
 
 directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
@@ -237,7 +238,9 @@ type Mutation
   @join__type(graph: BLOG_SERVICE)
   @join__type(graph: USER_SERVICE)
 {
-  """Create a new blog post. Emits blog.created Kafka event on success."""
+  """
+  Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.
+  """
   createBlog(input: CreateBlogInput!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
   """Partially update a blog post. Emits blog.updated Kafka event."""
@@ -246,10 +249,12 @@ type Mutation
   """Delete a blog post. Emits blog.deleted Kafka event."""
   deleteBlog(input: DeleteBlogInput!): BaseApiResponse! @join__field(graph: BLOG_SERVICE)
 
-  """Create a new user. Emits user.created Kafka event on success."""
+  """
+  Create a new user. Emits user.created Kafka event. Subscribers receive push once Kafka consumer fires.
+  """
   createUser(input: CreateUserInput!): UserResponse! @join__field(graph: USER_SERVICE)
 
-  """Partially update an existing user. Emits user.updated Kafka event."""
+  """Partially update a user. Emits user.updated Kafka event."""
   updateUser(input: UpdateUserInput!): UserResponse! @join__field(graph: USER_SERVICE)
 
   """Delete a user. Emits user.deleted Kafka event — blog orphans removed."""
@@ -260,21 +265,44 @@ type Query
   @join__type(graph: BLOG_SERVICE)
   @join__type(graph: USER_SERVICE)
 {
-  """Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."""
+  """Fetch all blog posts."""
   getBlogs: BlogsResponse! @join__field(graph: BLOG_SERVICE)
 
-  """
-  Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
-  """
+  """Fetch one blog post by UUID."""
   getBlog(input: GetBlogArgs!): BlogResponse! @join__field(graph: BLOG_SERVICE)
 
-  """Fetch all users. Returns UsersSuccessResponse or ErrorResponse."""
+  """Fetch all users."""
   getUsers: UsersResponse! @join__field(graph: USER_SERVICE)
 
-  """
-  Fetch a single user by UUID. Returns UserSuccessResponse or ErrorResponse.
-  """
+  """Fetch a single user by UUID."""
   getUser(input: GetUserArgs!): UserResponse! @join__field(graph: USER_SERVICE)
+}
+
+type Subscription
+  @join__type(graph: BLOG_SERVICE)
+  @join__type(graph: USER_SERVICE)
+{
+  """Real-time push when a blog post is created."""
+  blogCreated: Blog! @join__field(graph: BLOG_SERVICE)
+
+  """Real-time push when a blog post is updated."""
+  blogUpdated: Blog! @join__field(graph: BLOG_SERVICE)
+
+  """
+  Real-time push when a blog post is deleted. Returns the deleted blog id.
+  """
+  blogDeleted: String! @join__field(graph: BLOG_SERVICE)
+
+  """
+  Real-time push when a user is created (fires after Kafka consumer processes the event).
+  """
+  userCreated: User! @join__field(graph: USER_SERVICE)
+
+  """Real-time push when a user is updated."""
+  userUpdated: User! @join__field(graph: USER_SERVICE)
+
+  """Real-time push when a user is deleted. Returns the deleted user id."""
+  userDeleted: String! @join__field(graph: USER_SERVICE)
 }
 
 """Input for partially updating a blog post"""

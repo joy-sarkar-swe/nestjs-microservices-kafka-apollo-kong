@@ -10,42 +10,37 @@ import { Blog } from './entities/blog.entity';
  * @controller BlogsRestController
  * @description Pure REST endpoints consumed directly by Kong Gateway.
  *
- * Returns plain JSON — no ApiResponse envelope.
- * Kong upstream: http://host.docker.internal:3002
+ * All methods async — BlogsService and BlogRepository are async.
+ * Kong upstream: http://host.docker.internal:4002
  *
- * Routes
- * ├─ GET    /blogs         → list all blog posts
- * ├─ GET    /blogs/:id     → get one blog post
- * ├─ POST   /blogs         → create blog post (201)
- * ├─ PUT    /blogs/:id     → update blog post (partial)
- * └─ DELETE /blogs/:id     → delete blog post (200)
- *
- * NOTE: `author` field is not populated in REST responses.
- * REST consumers receive `authorId` and can call GET /users/:id separately.
- * Cross-service author resolution is a GraphQL/Federation concern only.
+ * Real-time (Socket.IO)
+ * ─────────────────────
+ * REST clients receive real-time pushes via Socket.IO /blogs namespace
+ * after the Kafka consumer processes each mutation.
+ * The REST response is immediate — Socket.IO push is async and independent.
  */
 @Controller('blogs')
 export class BlogsRestController {
   constructor(private readonly blogsService: BlogsService) {}
 
   @Get()
-  findAll(): Blog[] {
+  async findAll(): Promise<Blog[]> {
     return this.blogsService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Blog {
+  async findOne(@Param('id') id: string): Promise<Blog> {
     return this.blogsService.findOne(id);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() input: CreateBlogInput): Promise<Blog> {
+  async create(@Body() input: CreateBlogInput): Promise<Blog> {
     return this.blogsService.create(input);
   }
 
   @Put(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: Omit<UpdateBlogInput, 'id'>,
   ): Promise<Blog> {

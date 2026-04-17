@@ -36,12 +36,10 @@ type FieldError {
 }
 
 type Query {
-  """Fetch all blog posts. Returns BlogsSuccessResponse or ErrorResponse."""
+  """Fetch all blog posts."""
   getBlogs: BlogsResponse!
 
-  """
-  Fetch one blog post by UUID. Returns BlogSuccessResponse or ErrorResponse.
-  """
+  """Fetch one blog post by UUID."""
   getBlog(input: GetBlogArgs!): BlogResponse!
 }
 
@@ -110,7 +108,9 @@ input GetBlogArgs {
 }
 
 type Mutation {
-  """Create a new blog post. Emits blog.created Kafka event on success."""
+  """
+  Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.
+  """
   createBlog(input: CreateBlogInput!): BlogResponse!
 
   """Partially update a blog post. Emits blog.updated Kafka event."""
@@ -166,4 +166,17 @@ type BaseResponse {
 input DeleteBlogInput {
   """UUID of the blog post to delete"""
   id: ID!
+}
+
+type Subscription {
+  """Real-time push when a blog post is created."""
+  blogCreated: Blog!
+
+  """Real-time push when a blog post is updated."""
+  blogUpdated: Blog!
+
+  """
+  Real-time push when a blog post is deleted. Returns the deleted blog id.
+  """
+  blogDeleted: String!
 }
