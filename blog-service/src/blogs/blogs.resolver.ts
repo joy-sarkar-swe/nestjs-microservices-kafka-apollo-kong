@@ -51,6 +51,12 @@ export class BlogsResolver {
 
   // ── QUERIES ───────────────────────────────────────────────────────────────
 
+  /**
+   * Returns all blog posts wrapped in a BlogsSuccessResponse, or an ErrorResponse on failure.
+   *
+   * @returns {Promise<BlogsResponseType>} A BlogsSuccessResponse with the blog array,
+   *   or an ErrorResponse if the service throws.
+   */
   @Query(() => BlogsResponse, {
     name: 'getBlogs',
     description: 'Fetch all blog posts.',
@@ -64,6 +70,13 @@ export class BlogsResolver {
     }
   }
 
+  /**
+   * Returns a single blog post by UUID wrapped in a BlogSuccessResponse,
+   * or an ErrorResponse (404) when the blog does not exist.
+   *
+   * @param {GetBlogArgs} input - Validated input object containing the target `id`.
+   * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse.
+   */
   @Query(() => BlogResponse, {
     name: 'getBlog',
     description: 'Fetch one blog post by UUID.',
@@ -80,9 +93,12 @@ export class BlogsResolver {
   // ── FIELD RESOLVER ────────────────────────────────────────────────────────
 
   /**
-   * Returns federation User stub { id: blog.authorId } for every Blog.
-   * Apollo Router resolves the full User from user-service via _entities batch.
-   * N blogs → 1 round-trip to user-service (not N).
+   * Returns the Apollo Federation User stub `{ id: blog.authorId }` for every Blog.
+   * Apollo Router resolves the full User from user-service via a single batched
+   * `_entities` request — N blogs still results in only 1 round-trip to user-service.
+   *
+   * @param {Blog} blog - The parent Blog object being resolved.
+   * @returns {User} A minimal User reference object containing only the federation @key.
    */
   @ResolveField(() => User, {
     description: 'Author resolved from user-service via Apollo Federation _entities',
@@ -93,6 +109,14 @@ export class BlogsResolver {
 
   // ── MUTATIONS ─────────────────────────────────────────────────────────────
 
+  /**
+   * Creates a new blog post and returns a BlogSuccessResponse (HTTP 201) on success.
+   * On failure returns an ErrorResponse: 400 for validation failures.
+   * Also triggers a `blogCreated` subscription push via Kafka → PubSub pipeline.
+   *
+   * @param {CreateBlogInput} input - Validated input containing title, content, and authorId.
+   * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse.
+   */
   @Mutation(() => BlogResponse, {
     description: 'Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.',
   })
@@ -105,6 +129,14 @@ export class BlogsResolver {
     }
   }
 
+  /**
+   * Partially updates an existing blog post and returns a BlogSuccessResponse on success.
+   * Only `title` and `content` can be updated — `authorId` is immutable after creation.
+   * Also triggers a `blogUpdated` subscription push via Kafka → PubSub pipeline.
+   *
+   * @param {UpdateBlogInput} input - Validated input with `id` plus optional title/content.
+   * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse (404).
+   */
   @Mutation(() => BlogResponse, {
     description: 'Partially update a blog post. Emits blog.updated Kafka event.',
   })
@@ -117,6 +149,13 @@ export class BlogsResolver {
     }
   }
 
+  /**
+   * Deletes a blog post and returns a BaseResponse confirmation on success.
+   * Also emits a `blog.deleted` Kafka event which triggers a `blogDeleted` subscription push.
+   *
+   * @param {DeleteBlogInput} input - Validated input containing the blog's UUID.
+   * @returns {Promise<BaseApiResponseType>} A BaseResponse or ErrorResponse (404).
+   */
   @Mutation(() => BaseApiResponse, {
     description: 'Delete a blog post. Emits blog.deleted Kafka event.',
   })
@@ -133,12 +172,15 @@ export class BlogsResolver {
 
   /**
    * @subscription blogCreated
-   * Fires when BlogsKafkaController processes a blog.created event.
+   * Fires when BlogsKafkaController processes a blog.created Kafka event
+   * and calls pubSub.publish('blogCreated', { blogCreated: blog }).
    *
    * Client usage:
    *   subscription {
    *     blogCreated { id title content authorId author { id name email } }
    *   }
+   *
+   * @returns {AsyncIterator} Async iterator over the 'blogCreated' PubSub channel.
    */
   @Subscription(() => Blog, {
     description: 'Real-time push when a blog post is created.',
@@ -149,7 +191,9 @@ export class BlogsResolver {
 
   /**
    * @subscription blogUpdated
-   * Fires when BlogsKafkaController processes a blog.updated event.
+   * Fires when BlogsKafkaController processes a blog.updated Kafka event.
+   *
+   * @returns {AsyncIterator} Async iterator over the 'blogUpdated' PubSub channel.
    */
   @Subscription(() => Blog, {
     description: 'Real-time push when a blog post is updated.',
@@ -160,8 +204,10 @@ export class BlogsResolver {
 
   /**
    * @subscription blogDeleted
-   * Fires when BlogsKafkaController processes a blog.deleted event.
-   * Returns the deleted blog id as a String (the entity no longer exists).
+   * Fires when BlogsKafkaController processes a blog.deleted Kafka event.
+   * Returns the deleted blog's id as a String — the Blog entity no longer exists.
+   *
+   * @returns {AsyncIterator} Async iterator over the 'blogDeleted' PubSub channel.
    */
   @Subscription(() => String, {
     description: 'Real-time push when a blog post is deleted. Returns the deleted blog id.',
@@ -173,6 +219,16 @@ export class BlogsResolver {
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
+  /**
+   * Apollo Federation entity resolution for Blog.
+   * Apollo Router calls this when another subgraph references a Blog by id
+   * and the client requests Blog-owned fields.
+   * Returns raw Blog — no ApiResponse wrapping — this is a Router-internal call.
+   *
+   * @param {{ __typename: string; id: string }} reference - The minimal entity reference from the Router.
+   * @returns {Promise<Blog>} The fully populated Blog record.
+   * @throws {NotFoundException} If the referenced blog no longer exists.
+   */
   @ResolveReference()
   async resolveReference(reference: { __typename: string; id: string }): Promise<Blog> {
     return this.blogsService.resolveReference(reference);

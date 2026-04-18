@@ -14,7 +14,10 @@ import { Blog } from '../blogs/entities/blog.entity';
  * @gateway BlogEventsGateway
  * @description Socket.IO gateway for pushing blog domain events to REST clients.
  *
- * Push-only — no incoming message handlers.
+ * Push-only — no incoming message handlers (@SubscribeMessage decorators).
+ * REST clients connect once and passively receive events whenever the Kafka
+ * consumer fires after a mutation.
+ *
  * Namespace: /blogs
  *
  * Event flow (Pattern B)
@@ -36,6 +39,10 @@ import { Blog } from '../blogs/entities/blog.entity';
  *   socket.on('blog:created', (event) => console.log('New blog:', event.payload));
  *   socket.on('blog:updated', (event) => console.log('Updated blog:', event.payload));
  *   socket.on('blog:deleted', (event) => console.log('Deleted blog id:', event.payload.id));
+ *
+ * CORS
+ * ─────
+ * origin: '*' is acceptable for local demo. Restrict to specific origins in production.
  */
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -50,28 +57,69 @@ export class BlogEventsGateway
 
   private readonly logger = new Logger(BlogEventsGateway.name);
 
+  /**
+   * Called once by the NestJS WebSocket framework after the Socket.IO server
+   * has been initialised and is ready to accept connections on the /blogs namespace.
+   *
+   * @param {Server} server - The underlying Socket.IO server instance.
+   * @returns {void}
+   */
   afterInit(server: Server): void {
     this.logger.log('BlogEventsGateway initialised — Socket.IO /blogs namespace ready');
   }
 
+  /**
+   * Called each time a new Socket.IO client connects to the `/blogs` namespace.
+   *
+   * @param {Socket} client - The connecting Socket.IO client socket.
+   * @returns {void}
+   */
   handleConnection(client: Socket): void {
     this.logger.log(`Socket.IO client connected: ${client.id}`);
   }
 
+  /**
+   * Called each time a Socket.IO client disconnects from the `/blogs` namespace.
+   *
+   * @param {Socket} client - The disconnecting Socket.IO client socket.
+   * @returns {void}
+   */
   handleDisconnect(client: Socket): void {
     this.logger.log(`Socket.IO client disconnected: ${client.id}`);
   }
 
+  /**
+   * Broadcasts a `blog:created` event to all connected REST clients.
+   * Called by BlogsKafkaController after processing a blog.created Kafka event.
+   *
+   * @param {KafkaEvent<Blog>} event - Full KafkaEvent envelope with correlationId and Blog payload.
+   * @returns {void}
+   */
   emitBlogCreated(event: KafkaEvent<Blog>): void {
     this.server.emit('blog:created', event);
     this.logger.log(`[blog:created] broadcast — correlationId=${event.correlationId}`);
   }
 
+  /**
+   * Broadcasts a `blog:updated` event to all connected REST clients.
+   * Called by BlogsKafkaController after processing a blog.updated Kafka event.
+   *
+   * @param {KafkaEvent<Blog>} event - Full KafkaEvent envelope with correlationId and updated Blog payload.
+   * @returns {void}
+   */
   emitBlogUpdated(event: KafkaEvent<Blog>): void {
     this.server.emit('blog:updated', event);
     this.logger.log(`[blog:updated] broadcast — correlationId=${event.correlationId}`);
   }
 
+  /**
+   * Broadcasts a `blog:deleted` event to all connected REST clients.
+   * Called by BlogsKafkaController after processing a blog.deleted Kafka event.
+   * The payload contains the deleted blog's id (and optionally a deletion reason).
+   *
+   * @param {KafkaEvent<{ id: string }>} event - Full KafkaEvent envelope with the deleted blog id.
+   * @returns {void}
+   */
   emitBlogDeleted(event: KafkaEvent<{ id: string }>): void {
     this.server.emit('blog:deleted', event);
     this.logger.log(`[blog:deleted] broadcast — correlationId=${event.correlationId}`);

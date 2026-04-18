@@ -1,64 +1,90 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
-import { DateTimeScalar } from '../graphql/scalars';
-import { Blog } from '../../blogs/entities/blog.entity';
+import { Field, Int, ObjectType } from "@nestjs/graphql";
+import { Blog } from "../../blogs/entities/blog.entity";
+import { DateTimeScalar } from "../graphql/scalars";
 
 /**
  * @type BlogSuccessResponse
- * @description Specific success response wrapping a single Blog entity.
+ * @description Success response wrapping a single Blog entity.
  *
- * The `data` field contains the full Blog object including the federation
- * `author` stub `{ id }` — Apollo Router resolves full User fields from
- * user-service when the client queries `data { author { name email } }`.
+ * The `data.author` field is a federation stub `{ id }` in GraphQL responses —
+ * Apollo Router resolves the full User from user-service when the client
+ * queries `data { author { name email } }`.
+ *
+ * In REST responses, `author` is fully resolved by BlogsRestController via
+ * UserServiceClient before being serialised — REST consumers receive a
+ * complete `BlogWithAuthor` shape (not this GraphQL type directly).
+ *
+ * Part of the `BlogResponse` union. Clients discriminate on `__typename`.
  *
  * GraphQL schema:
  *   type BlogSuccessResponse {
- *     statusCode: Int!  success: Boolean!  message: String!
- *     data: Blog!  timestamp: DateTime!
+ *     statusCode: Int!   success: Boolean!   message: String!
+ *     data: Blog!   timestamp: DateTime!
  *   }
  */
-@ObjectType({ description: 'Success response wrapping a single Blog entity' })
+@ObjectType({ description: "Success response wrapping a single Blog entity" })
 export class BlogSuccessResponse {
-  @Field(() => Int, { description: 'HTTP-equivalent status code' })
+  /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
   statusCode: number;
 
-  @Field(() => Boolean, { description: 'Always true' })
+  /** Always true for BlogSuccessResponse. */
+  @Field(() => Boolean, { description: "Always true" })
   success: boolean;
 
-  @Field(() => String, { description: 'Human-readable success message' })
+  /** Human-readable success message. */
+  @Field(() => String, { description: "Human-readable success message" })
   message: string;
 
-  /** The resolved Blog entity — author field is a federation stub { id }. */
-  @Field(() => Blog, { description: 'The resolved Blog entity' })
+  /** The resolved Blog entity — author field is a federation stub { id } in GraphQL. */
+  @Field(() => Blog, { description: "The resolved Blog entity" })
   data: Blog;
 
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
+  @Field(() => DateTimeScalar, {
+    description: "Server-side response timestamp",
+  })
   timestamp: Date;
 }
 
 /**
  * @type BlogsSuccessResponse
- * @description Specific success response wrapping a Blog array.
+ * @description Success response wrapping a Blog array.
+ *
+ * Returned by the `getBlogs` query when the operation succeeds.
+ * Each Blog in `data` carries an author federation stub `{ id }` in GraphQL;
+ * Apollo Router resolves full User fields per-blog via a single batched
+ * `_entities` request to user-service.
+ *
+ * Clients discriminate on `__typename === 'BlogsSuccessResponse'`.
  *
  * GraphQL schema:
  *   type BlogsSuccessResponse {
- *     statusCode: Int!  success: Boolean!  message: String!
- *     data: [Blog!]!  timestamp: DateTime!
+ *     statusCode: Int!   success: Boolean!   message: String!
+ *     data: [Blog!]!   timestamp: DateTime!
  *   }
  */
-@ObjectType({ description: 'Success response wrapping a list of Blog entities' })
+@ObjectType({
+  description: "Success response wrapping a list of Blog entities",
+})
 export class BlogsSuccessResponse {
+  /** HTTP-equivalent status code. Typically 200. */
   @Field(() => Int)
   statusCode: number;
 
+  /** Always true for BlogsSuccessResponse. */
   @Field(() => Boolean)
   success: boolean;
 
+  /** Human-readable success message. */
   @Field(() => String)
   message: string;
 
-  @Field(() => [Blog], { description: 'The resolved Blog list' })
+  /** The resolved Blog list. Empty array when no blog posts exist. */
+  @Field(() => [Blog], { description: "The resolved Blog list" })
   data: Blog[];
 
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar)
   timestamp: Date;
 }

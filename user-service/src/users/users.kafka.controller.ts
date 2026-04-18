@@ -63,6 +63,15 @@ export class UsersKafkaController {
 
   // ── user.created ──────────────────────────────────────────────────────────
 
+  /**
+   * Handles the `user.created` Kafka topic.
+   * After parsing and deduplication, publishes to the GraphQL PubSub channel
+   * and broadcasts via Socket.IO to all connected REST clients.
+   *
+   * @param {any} raw - Raw Kafka message payload (string or object).
+   * @param {KafkaContext} ctx - Kafka execution context providing topic and partition metadata.
+   * @returns {Promise<void>}
+   */
   @EventPattern('user.created')
   async handleUserCreated(
     @Payload() raw: any,
@@ -91,6 +100,15 @@ export class UsersKafkaController {
 
   // ── user.updated ──────────────────────────────────────────────────────────
 
+  /**
+   * Handles the `user.updated` Kafka topic.
+   * After parsing and deduplication, publishes to the GraphQL PubSub channel
+   * and broadcasts via Socket.IO to all connected REST clients.
+   *
+   * @param {any} raw - Raw Kafka message payload.
+   * @param {KafkaContext} ctx - Kafka execution context.
+   * @returns {Promise<void>}
+   */
   @EventPattern('user.updated')
   async handleUserUpdated(
     @Payload() raw: any,
@@ -115,6 +133,15 @@ export class UsersKafkaController {
 
   // ── user.deleted ──────────────────────────────────────────────────────────
 
+  /**
+   * Handles the `user.deleted` Kafka topic.
+   * After parsing and deduplication, publishes the deleted user's id to the
+   * GraphQL PubSub channel and broadcasts via Socket.IO to REST clients.
+   *
+   * @param {any} raw - Raw Kafka message payload containing `{ id: string }`.
+   * @param {KafkaContext} ctx - Kafka execution context.
+   * @returns {Promise<void>}
+   */
   @EventPattern('user.deleted')
   async handleUserDeleted(
     @Payload() raw: any,
@@ -140,9 +167,13 @@ export class UsersKafkaController {
   // ── HELPERS ───────────────────────────────────────────────────────────────
 
   /**
-   * Parse and validate the KafkaEvent envelope.
+   * Parses and validates the KafkaEvent envelope from a raw Kafka message.
    * Returns null (and logs a warning) on malformed payloads so the
    * consumer never crashes on bad messages.
+   *
+   * @template T - The expected shape of the event's `payload` field.
+   * @param {any} raw - Raw value received from the Kafka transport.
+   * @returns {KafkaEvent<T> | null} The parsed envelope, or null if malformed.
    */
   private parseEnvelope<T>(raw: any): KafkaEvent<T> | null {
     try {
@@ -160,7 +191,13 @@ export class UsersKafkaController {
     }
   }
 
-  /** True if correlationId has already been processed. */
+  /**
+   * Checks whether a correlationId has already been processed.
+   * Used to guard against duplicate deliveries from Kafka's at-least-once guarantee.
+   *
+   * @param {string} correlationId - UUID v4 from the KafkaEvent envelope.
+   * @returns {boolean} True if this correlationId was already handled; false otherwise.
+   */
   private isDuplicate(correlationId: string): boolean {
     if (this.processedCorrelationIds.has(correlationId)) {
       this.logger.warn(`Duplicate Kafka event skipped — correlationId=${correlationId}`);
@@ -169,7 +206,14 @@ export class UsersKafkaController {
     return false;
   }
 
-  /** Mark correlationId as processed. Caps set size to prevent unbounded growth. */
+  /**
+   * Marks a correlationId as successfully processed.
+   * Caps the set size at 10 000 entries to prevent unbounded memory growth
+   * by evicting the oldest entry when the limit is reached.
+   *
+   * @param {string} correlationId - UUID v4 to mark as processed.
+   * @returns {void}
+   */
   private markProcessed(correlationId: string): void {
     this.processedCorrelationIds.add(correlationId);
     // Keep only the last 10 000 ids to bound memory usage
@@ -180,8 +224,15 @@ export class UsersKafkaController {
   }
 
   /**
-   * Forward failed messages to the dead-letter topic.
-   * The DLQ message preserves the original payload plus error metadata.
+   * Forwards a failed Kafka message to the dead-letter queue topic.
+   * The DLQ message preserves the original payload plus structured error metadata
+   * so a separate DLQ consumer can inspect and replay it.
+   *
+   * @param {string} topic - The original Kafka topic on which processing failed.
+   * @param {any} raw - The original raw Kafka message payload.
+   * @param {unknown} err - The error that caused processing to fail.
+   * @param {KafkaContext} ctx - Kafka context used to extract partition metadata.
+   * @returns {void}
    */
   private sendToDlq(topic: string, raw: any, err: unknown, ctx: KafkaContext): void {
     const errorMessage = err instanceof Error ? err.message : String(err);

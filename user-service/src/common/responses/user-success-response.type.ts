@@ -59,6 +59,9 @@ export class UserSuccessResponse {
  * @type UsersSuccessResponse
  * @description Specific success response for operations that return a User list.
  *
+ * Returned by the `getUsers` query when the operation succeeds.
+ * Clients discriminate on `__typename === 'UsersSuccessResponse'`.
+ *
  * GraphQL schema:
  *   type UsersSuccessResponse {
  *     statusCode: Int!
@@ -70,19 +73,23 @@ export class UserSuccessResponse {
  */
 @ObjectType({ description: 'Success response wrapping a list of User entities' })
 export class UsersSuccessResponse {
+  /** HTTP-equivalent status code. Typically 200. */
   @Field(() => Int)
   statusCode: number;
 
+  /** Always true for UsersSuccessResponse. */
   @Field(() => Boolean)
   success: boolean;
 
+  /** Human-readable success message. */
   @Field(() => String)
   message: string;
 
-  /** The resolved array of User entities. */
+  /** The resolved array of User entities. Empty array when no users exist. */
   @Field(() => [User], { description: 'The resolved User list' })
   data: User[];
 
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar)
   timestamp: Date;
 }

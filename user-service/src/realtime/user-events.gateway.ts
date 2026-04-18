@@ -57,21 +57,43 @@ export class UserEventsGateway
 
   private readonly logger = new Logger(UserEventsGateway.name);
 
+  /**
+   * Called once by the NestJS WebSocket framework after the Socket.IO server
+   * has been initialised and is ready to accept connections.
+   *
+   * @param {Server} server - The underlying Socket.IO server instance.
+   * @returns {void}
+   */
   afterInit(server: Server): void {
     this.logger.log('UserEventsGateway initialised — Socket.IO /users namespace ready');
   }
 
+  /**
+   * Called each time a new Socket.IO client connects to the `/users` namespace.
+   *
+   * @param {Socket} client - The connecting Socket.IO client socket.
+   * @returns {void}
+   */
   handleConnection(client: Socket): void {
     this.logger.log(`Socket.IO client connected: ${client.id}`);
   }
 
+  /**
+   * Called each time a Socket.IO client disconnects from the `/users` namespace.
+   *
+   * @param {Socket} client - The disconnecting Socket.IO client socket.
+   * @returns {void}
+   */
   handleDisconnect(client: Socket): void {
     this.logger.log(`Socket.IO client disconnected: ${client.id}`);
   }
 
   /**
-   * Broadcast user:created to all connected REST clients.
+   * Broadcasts a `user:created` event to all connected REST clients.
    * Called by UsersKafkaController after the in-memory write succeeds.
+   *
+   * @param {KafkaEvent<User>} event - The full KafkaEvent envelope including correlationId and User payload.
+   * @returns {void}
    */
   emitUserCreated(event: KafkaEvent<User>): void {
     this.server.emit('user:created', event);
@@ -79,7 +101,11 @@ export class UserEventsGateway
   }
 
   /**
-   * Broadcast user:updated to all connected REST clients.
+   * Broadcasts a `user:updated` event to all connected REST clients.
+   * Called by UsersKafkaController after processing a user.updated Kafka event.
+   *
+   * @param {KafkaEvent<User>} event - The full KafkaEvent envelope including correlationId and updated User payload.
+   * @returns {void}
    */
   emitUserUpdated(event: KafkaEvent<User>): void {
     this.server.emit('user:updated', event);
@@ -87,7 +113,11 @@ export class UserEventsGateway
   }
 
   /**
-   * Broadcast user:deleted to all connected REST clients.
+   * Broadcasts a `user:deleted` event to all connected REST clients.
+   * Called by UsersKafkaController after processing a user.deleted Kafka event.
+   *
+   * @param {KafkaEvent<{ id: string }>} event - The full KafkaEvent envelope with the deleted user's id.
+   * @returns {void}
    */
   emitUserDeleted(event: KafkaEvent<{ id: string }>): void {
     this.server.emit('user:deleted', event);

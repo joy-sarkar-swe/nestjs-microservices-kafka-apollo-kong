@@ -64,6 +64,12 @@ export class UsersResolver {
 
   // ── QUERIES ───────────────────────────────────────────────────────────────
 
+  /**
+   * Returns all users wrapped in a UsersSuccessResponse, or an ErrorResponse on failure.
+   *
+   * @returns {Promise<UsersResponseType>} A UsersSuccessResponse containing the user array,
+   *   or an ErrorResponse if the service throws.
+   */
   @Query(() => UsersResponse, {
     name: 'getUsers',
     description: 'Fetch all users.',
@@ -77,6 +83,13 @@ export class UsersResolver {
     }
   }
 
+  /**
+   * Returns a single user by UUID wrapped in a UserSuccessResponse,
+   * or an ErrorResponse (404) when the user does not exist.
+   *
+   * @param {GetUserArgs} input - Validated input object containing the target `id`.
+   * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse.
+   */
   @Query(() => UserResponse, {
     name: 'getUser',
     description: 'Fetch a single user by UUID.',
@@ -92,6 +105,14 @@ export class UsersResolver {
 
   // ── MUTATIONS ─────────────────────────────────────────────────────────────
 
+  /**
+   * Creates a new user and returns a UserSuccessResponse (HTTP 201) on success.
+   * On failure returns an ErrorResponse: 400 for validation, 409 for duplicate email.
+   * Also triggers a `userCreated` subscription push via Kafka → PubSub pipeline.
+   *
+   * @param {CreateUserInput} input - Validated input containing `name` and `email`.
+   * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse.
+   */
   @Mutation(() => UserResponse, {
     description: 'Create a new user. Emits user.created Kafka event. Subscribers receive push once Kafka consumer fires.',
   })
@@ -104,6 +125,14 @@ export class UsersResolver {
     }
   }
 
+  /**
+   * Partially updates an existing user and returns a UserSuccessResponse on success.
+   * Only the fields present in `input` are applied (patch semantics).
+   * Also triggers a `userUpdated` subscription push via Kafka → PubSub pipeline.
+   *
+   * @param {UpdateUserInput} input - Validated input with `id` plus optional `name`/`email`.
+   * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse (404/409).
+   */
   @Mutation(() => UserResponse, {
     description: 'Partially update a user. Emits user.updated Kafka event.',
   })
@@ -116,6 +145,15 @@ export class UsersResolver {
     }
   }
 
+  /**
+   * Deletes a user and returns a BaseResponse confirmation on success.
+   * Also emits a `user.deleted` Kafka event which:
+   *   - Triggers a `userDeleted` subscription push.
+   *   - Causes blog-service to remove all orphaned posts by this author.
+   *
+   * @param {DeleteUserInput} input - Validated input containing the target `id`.
+   * @returns {Promise<BaseApiResponseType>} A BaseResponse or ErrorResponse (404).
+   */
   @Mutation(() => BaseApiResponse, {
     description: 'Delete a user. Emits user.deleted Kafka event — blog orphans removed.',
   })
@@ -139,6 +177,8 @@ export class UsersResolver {
    *   subscription {
    *     userCreated { id name email }
    *   }
+   *
+   * @returns {AsyncIterator} Async iterator over the 'userCreated' PubSub channel.
    */
   @Subscription(() => User, {
     description: 'Real-time push when a user is created (fires after Kafka consumer processes the event).',
@@ -150,6 +190,8 @@ export class UsersResolver {
   /**
    * @subscription userUpdated
    * Fires when the Kafka consumer processes a user.updated event.
+   *
+   * @returns {AsyncIterator} Async iterator over the 'userUpdated' PubSub channel.
    */
   @Subscription(() => User, {
     description: 'Real-time push when a user is updated.',
@@ -161,7 +203,9 @@ export class UsersResolver {
   /**
    * @subscription userDeleted
    * Fires when the Kafka consumer processes a user.deleted event.
-   * Payload is { id: string } because the User no longer exists.
+   * Payload is the deleted user's id as a String — the User no longer exists.
+   *
+   * @returns {AsyncIterator} Async iterator over the 'userDeleted' PubSub channel.
    */
   @Subscription(() => String, {
     description: 'Real-time push when a user is deleted. Returns the deleted user id.',
@@ -174,9 +218,14 @@ export class UsersResolver {
   // ── FEDERATION ────────────────────────────────────────────────────────────
 
   /**
-   * @resolveReference
-   * Now async — required because the repository layer is async.
-   * Apollo Router calls this when blog-service returns User { id } stubs.
+   * Apollo Federation entity resolution entry point.
+   * Apollo Router calls this when blog-service returns a `User { id }` stub
+   * and the client requests additional User fields (name, email).
+   * Must be async because the repository layer is always async.
+   *
+   * @param {{ __typename: string; id: string }} reference - The minimal entity reference from the Router.
+   * @returns {Promise<User>} The fully populated User record.
+   * @throws {NotFoundException} If the referenced user no longer exists.
    */
   @ResolveReference()
   async resolveReference(reference: { __typename: string; id: string }): Promise<User> {

@@ -44,6 +44,11 @@ import { KafkaEvent } from '../common/kafka/kafka-event.interface';
  */
 @Injectable()
 export class BlogsService implements OnModuleInit {
+  /**
+   * Kafka producer client for publishing blog domain events.
+   * `allowAutoTopicCreation` ensures topics are created on first emit
+   * without requiring manual Kafka CLI setup.
+   */
   @Client({
     transport: Transport.KAFKA,
     options: {
@@ -56,22 +61,42 @@ export class BlogsService implements OnModuleInit {
   })
   private kafkaClient: ClientKafka;
 
+  /**
+   * Injected blog persistence layer.
+   * The concrete class is determined by BlogsModule providers — this service
+   * never imports InMemoryBlogRepository or any DB-specific class directly.
+   */
   constructor(
     @Inject('BLOG_REPOSITORY')
     private readonly repo: BlogRepository,
   ) {}
 
+  /**
+   * Connects the Kafka producer client on module initialisation.
+   * NestJS guarantees this lifecycle hook runs before the first request is handled.
+   *
+   * @returns {Promise<void>}
+   */
   async onModuleInit(): Promise<void> {
     await this.kafkaClient.connect();
   }
 
   // ── READ ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Returns all blog posts from the repository.
+   *
+   * @returns {Promise<Blog[]>} All blog posts; possibly an empty array.
+   */
   async findAll(): Promise<Blog[]> {
     return this.repo.findAll();
   }
 
   /**
+   * Returns a single blog post by UUID.
+   *
+   * @param {string} id - UUID v4 of the target blog post.
+   * @returns {Promise<Blog>} The matching Blog record.
    * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
   async findOne(id: string): Promise<Blog> {
@@ -85,12 +110,17 @@ export class BlogsService implements OnModuleInit {
   // ── CREATE ────────────────────────────────────────────────────────────────
 
   /**
+   * Creates a new blog post and emits a `blog.created` Kafka event.
+   *
    * Flow: build entity (with federation stub) → persist → emit → return
    *
    * The author field is set to { id: authorId } — the federation reference.
    * Apollo Router resolves the full User from user-service at query time.
    * blog-service never validates whether the user actually exists; that is
    * enforced at the application level before calling this service.
+   *
+   * @param {CreateBlogInput} input - Validated DTO containing title, content, and authorId.
+   * @returns {Promise<Blog>} The newly created Blog with assigned UUID.
    */
   async create(input: CreateBlogInput): Promise<Blog> {
     const blog: Blog = {
@@ -109,8 +139,12 @@ export class BlogsService implements OnModuleInit {
   // ── UPDATE ────────────────────────────────────────────────────────────────
 
   /**
-   * Only title and content are updatable. authorId is immutable after creation.
-   * @throws {NotFoundException} 404 when id not found.
+   * Partially updates an existing blog post and emits a `blog.updated` Kafka event.
+   * Only `title` and `content` are updatable; `authorId` is immutable after creation.
+   *
+   * @param {UpdateBlogInput} input - Validated DTO with id plus optional title/content.
+   * @returns {Promise<Blog>} The fully updated Blog record.
+   * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
   async update(input: UpdateBlogInput): Promise<Blog> {
     await this.findOne(input.id); // throws 404
@@ -127,7 +161,11 @@ export class BlogsService implements OnModuleInit {
   // ── DELETE ────────────────────────────────────────────────────────────────
 
   /**
-   * @throws {NotFoundException} 404 when id not found.
+   * Deletes a blog post and emits a `blog.deleted` Kafka event.
+   *
+   * @param {DeleteBlogInput} input - Validated DTO containing the blog's UUID.
+   * @returns {Promise<void>}
+   * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
   async delete(input: DeleteBlogInput): Promise<void> {
     await this.findOne(input.id); // throws 404
@@ -138,12 +176,16 @@ export class BlogsService implements OnModuleInit {
   // ── CROSS-SERVICE ─────────────────────────────────────────────────────────
 
   /**
-   * Called by BlogsKafkaController when a user.deleted event arrives.
-   * Implements referential integrity via async events — equivalent to
-   * ON DELETE CASCADE across service boundaries.
+   * Removes all blog posts authored by the specified user.
+   * Called by BlogsKafkaController when a `user.deleted` Kafka event arrives.
    *
-   * Each orphaned post emits its own blog.deleted event so downstream
-   * consumers (search index, CDN, analytics) can react.
+   * Implements referential integrity via async events — equivalent to
+   * ON DELETE CASCADE across service boundaries without a shared database.
+   * Each orphaned post emits its own `blog.deleted` event so downstream
+   * consumers (search index, CDN, analytics) can react accordingly.
+   *
+   * @param {string} userId - UUID of the user whose posts should be removed.
+   * @returns {Promise<void>}
    */
   async handleUserDeleted(userId: string): Promise<void> {
     const orphaned = await this.repo.findByAuthorId(userId);
@@ -168,7 +210,13 @@ export class BlogsService implements OnModuleInit {
 
   /**
    * Apollo Federation entity resolver for Blog.
+   * Called by Apollo Router via the `_entities` query when another subgraph
+   * references a Blog by id and the client requests Blog-owned fields.
    * Returns raw Blog — no response wrapping.
+   *
+   * @param {{ id: string }} reference - Minimal entity reference from the Router.
+   * @returns {Promise<Blog>} The fully populated Blog record.
+   * @throws {NotFoundException} If the referenced blog no longer exists.
    */
   async resolveReference(reference: { id: string }): Promise<Blog> {
     return this.findOne(reference.id);
@@ -177,9 +225,17 @@ export class BlogsService implements OnModuleInit {
   // ── KAFKA ─────────────────────────────────────────────────────────────────
 
   /**
-   * Wraps payload in KafkaEvent envelope and emits fire-and-forget.
-   * correlationId is a fresh UUID per call — consumers use it for idempotency
-   * and to route real-time notifications back to the right subscriber.
+   * Wraps a domain payload in a KafkaEvent envelope and emits it fire-and-forget.
+   *
+   * The `correlationId` is a fresh UUID per call — consumers use it for idempotency
+   * and to route real-time notifications back to the correct subscriber.
+   * The Kafka message key is set to the entity id to ensure consistent partition
+   * routing (all events for the same entity land on the same partition, preserving order).
+   *
+   * @template T - The shape of the domain payload; must include an optional `id` field.
+   * @param {string} topic - Kafka topic name (e.g. 'blog.created').
+   * @param {T} payload - The domain object to wrap and emit.
+   * @returns {void}
    */
   private publish<T extends { id?: string }>(topic: string, payload: T): void {
     const event: KafkaEvent<T> = {

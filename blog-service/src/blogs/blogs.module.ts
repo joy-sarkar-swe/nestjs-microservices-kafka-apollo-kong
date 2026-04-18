@@ -6,6 +6,7 @@ import { BlogsRestController } from './blogs.rest.controller';
 import { BlogsKafkaController } from './blogs.kafka.controller';
 import { InMemoryBlogRepository } from './repositories/in-memory-blog.repository';
 import { BlogEventsGateway } from '../realtime/blog-events.gateway';
+import { UserServiceClient } from '../common/http/user-service.client';
 
 /**
  * @module BlogsModule
@@ -25,7 +26,14 @@ import { BlogEventsGateway } from '../realtime/blog-events.gateway';
  *   Singleton PubSub shared between:
  *     - BlogsResolver (Subscription resolvers read from it)
  *     - BlogsKafkaController (publishes after consuming Kafka events)
+ *   Both must share the SAME instance — PubSub is in-process, not distributed.
  *   For multi-instance deployments replace with RedisPubSub.
+ *
+ * UserServiceClient
+ *   HTTP client that blog-service uses to resolve User data for REST responses.
+ *   Provides batched author resolution (GET /users?ids=...) and TTL caching.
+ *   Injected into BlogsRestController (for read paths) and BlogsKafkaController
+ *   (for cache eviction on user.updated / user.deleted events).
  *
  * BlogEventsGateway
  *   Socket.IO gateway for REST clients on /blogs namespace.
@@ -44,6 +52,9 @@ import { BlogEventsGateway } from '../realtime/blog-events.gateway';
       provide: 'GQL_PUB_SUB',
       useFactory: () => new PubSub(),
     },
+
+    // ── HTTP client for author resolution ─────────────────────────────────
+    UserServiceClient,
 
     // ── Feature providers ─────────────────────────────────────────────────
     BlogsService,

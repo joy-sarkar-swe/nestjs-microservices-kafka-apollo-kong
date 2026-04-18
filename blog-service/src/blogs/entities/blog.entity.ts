@@ -26,6 +26,11 @@ import { ObjectType, Field, ID, Directive } from '@nestjs/graphql';
 @Directive('@extends')
 @Directive('@key(fields: "id")')
 export class User {
+  /**
+   * User UUID — serves as the Apollo Federation @key linking this stub to the
+   * full User entity in user-service. Marked @external because blog-service
+   * does not own or store User data beyond this id.
+   */
   @Field(() => ID, { description: 'User UUID — federation linking key' })
   @Directive('@external')
   id: string;
@@ -56,15 +61,23 @@ export class User {
 @ObjectType({ description: 'A blog post owned by blog-service' })
 @Directive('@key(fields: "id")')
 export class Blog {
+  /** UUID v4 primary key — doubles as the Apollo Federation @key. */
   @Field(() => ID, { description: 'Unique blog post identifier (UUID v4)' })
   id: string;
 
+  /** Headline / title of the blog post. */
   @Field(() => String, { description: 'Post headline' })
   title: string;
 
+  /** Full body text of the blog post. */
   @Field(() => String, { description: 'Post body text' })
   content: string;
 
+  /**
+   * UUID of the author — references User.id in user-service.
+   * Stored as a plain string; referential integrity is maintained via
+   * Kafka events (user.deleted triggers orphan post cleanup).
+   */
   @Field(() => ID, { description: 'UUID of the author — references User.id in user-service' })
   authorId: string;
 
