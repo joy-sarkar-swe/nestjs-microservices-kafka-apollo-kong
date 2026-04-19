@@ -4,6 +4,8 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { GqlValidationFilter } from './common/filters/gql-validation.filter';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 /**
  * @bootstrap  (user-service)
@@ -57,8 +59,11 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // ── GraphQL validation filter ─────────────────────────────────────────
-  app.useGlobalFilters(new GqlValidationFilter());
+  // ── Global Interceptors ─────────────────────────────────────────────
+  app.useGlobalInterceptors(new ResponseInterceptor());
+
+  // ── Global Filters ───────────────────────────────────────────────────
+  app.useGlobalFilters(new GqlValidationFilter(), new HttpExceptionFilter());
 
   app.enableCors();
 
