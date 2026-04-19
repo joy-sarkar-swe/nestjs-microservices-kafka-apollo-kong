@@ -15,13 +15,24 @@ import { FieldError } from "./field-error.type";
  *
  * GraphQL schema:
  *   type ErrorResponse {
- *     statusCode: Int!   success: Boolean!   message: String!
- *     errors: [FieldError!]   timestamp: DateTime!
+ *     success: Boolean!
+ *     message: String!
+ *     statusCode: Int!
+ *     timestamp: DateTime!
+ *     errors: [FieldError!]
  *   }
  */
 @Directive("@shareable")
 @ObjectType({ description: "Returned when a blog-service operation fails" })
 export class ErrorResponse {
+  /** Always false for ErrorResponse. Enables quick client-side branching on `success`. */
+  @Field(() => Boolean, { description: "Always false for error responses" })
+  success: boolean;
+
+  /** Top-level human-readable description of the failure. */
+  @Field(() => String, { description: "Human-readable error summary" })
+  message: string;
+
   /**
    * HTTP-equivalent status code.
    * 400 — validation failure (errors array populated)
@@ -32,13 +43,11 @@ export class ErrorResponse {
   @Field(() => Int, { description: "HTTP-equivalent status code" })
   statusCode: number;
 
-  /** Always false for ErrorResponse. Enables quick client-side branching on `success`. */
-  @Field(() => Boolean, { description: "Always false for error responses" })
-  success: boolean;
-
-  /** Top-level human-readable description of the failure. */
-  @Field(() => String, { description: "Human-readable error summary" })
-  message: string;
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
+  @Field(() => DateTimeScalar, {
+    description: "Server-side response timestamp",
+  })
+  timestamp: Date;
 
   /**
    * Field-level validation errors from class-validator.
@@ -49,12 +58,6 @@ export class ErrorResponse {
     description: "Field-level validation errors (present on status 400 only)",
   })
   errors?: FieldError[];
-
-  /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, {
-    description: "Server-side response timestamp",
-  })
-  timestamp: Date;
 }
 
 /**
@@ -69,7 +72,7 @@ export class ErrorResponse {
  *
  * GraphQL schema:
  *   type BaseResponse {
- *     statusCode: Int!   success: Boolean!   message: String!   timestamp: DateTime!
+ *     success: Boolean!   message: String!   statusCode: Int!   timestamp: DateTime!
  *   }
  */
 @Directive("@shareable")
@@ -77,10 +80,6 @@ export class ErrorResponse {
   description: "Generic success confirmation without a data payload",
 })
 export class BaseResponse {
-  /** HTTP-equivalent status code. Typically 200 for successful deletions. */
-  @Field(() => Int, { description: "HTTP-equivalent status code" })
-  statusCode: number;
-
   /** Always true for BaseResponse. */
   @Field(() => Boolean, { description: "Always true for success responses" })
   success: boolean;
@@ -88,6 +87,10 @@ export class BaseResponse {
   /** Human-readable confirmation message (e.g. "Blog post deleted successfully"). */
   @Field(() => String, { description: "Human-readable success message" })
   message: string;
+
+  /** HTTP-equivalent status code. Typically 200 for successful deletions. */
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
+  statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar, {

@@ -24,6 +24,14 @@ import { FieldError } from './field-error.type';
 @Directive('@shareable')
 @ObjectType({ description: 'Returned when an operation fails for any reason' })
 export class ErrorResponse {
+  /** Always false for ErrorResponse. Enables quick client-side branching. */
+  @Field(() => Boolean, { description: 'Always false for error responses' })
+  success: boolean;
+
+  /** Top-level human-readable error description. */
+  @Field(() => String, { description: 'Human-readable error summary' })
+  message: string;
+
   /**
    * HTTP-equivalent status code.
    * 400 — validation failure
@@ -34,13 +42,9 @@ export class ErrorResponse {
   @Field(() => Int, { description: 'HTTP-equivalent status code' })
   statusCode: number;
 
-  /** Always false for ErrorResponse. Enables quick client-side branching. */
-  @Field(() => Boolean, { description: 'Always false for error responses' })
-  success: boolean;
-
-  /** Top-level human-readable error description. */
-  @Field(() => String, { description: 'Human-readable error summary' })
-  message: string;
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
+  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  timestamp: Date;
 
   /**
    * Field-level validation errors.
@@ -52,8 +56,4 @@ export class ErrorResponse {
     description: 'Field-level validation errors (present on status 400 only)',
   })
   errors?: FieldError[];
-
-  /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
-  timestamp: Date;
 }

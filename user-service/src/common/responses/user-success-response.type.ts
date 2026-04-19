@@ -30,10 +30,6 @@ import { User } from '../../users/entities/user.entity';
  */
 @ObjectType({ description: 'Success response wrapping a single User entity' })
 export class UserSuccessResponse {
-  /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
-  @Field(() => Int, { description: 'HTTP-equivalent status code' })
-  statusCode: number;
-
   /** Always true for UserSuccessResponse. */
   @Field(() => Boolean, { description: 'Always true for success responses' })
   success: boolean;
@@ -42,6 +38,14 @@ export class UserSuccessResponse {
   @Field(() => String, { description: 'Human-readable success message' })
   message: string;
 
+  /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
+  @Field(() => Int, { description: 'HTTP-equivalent status code' })
+  statusCode: number;
+
+  /** ISO 8601 timestamp of when the response was generated (server clock). */
+  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  timestamp: Date;
+
   /**
    * @field data
    * The resolved User entity.
@@ -49,10 +53,6 @@ export class UserSuccessResponse {
    */
   @Field(() => User, { description: 'The resolved User entity' })
   data: User;
-
-  /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
-  timestamp: Date;
 }
 
 /**
@@ -64,19 +64,15 @@ export class UserSuccessResponse {
  *
  * GraphQL schema:
  *   type UsersSuccessResponse {
- *     statusCode: Int!
  *     success:    Boolean!
  *     message:    String!
- *     data:       [User!]!
+ *     statusCode: Int!
  *     timestamp:  DateTime!
+ *     data:       [User!]!
  *   }
  */
 @ObjectType({ description: 'Success response wrapping a list of User entities' })
 export class UsersSuccessResponse {
-  /** HTTP-equivalent status code. Typically 200. */
-  @Field(() => Int)
-  statusCode: number;
-
   /** Always true for UsersSuccessResponse. */
   @Field(() => Boolean)
   success: boolean;
@@ -85,11 +81,15 @@ export class UsersSuccessResponse {
   @Field(() => String)
   message: string;
 
-  /** The resolved array of User entities. Empty array when no users exist. */
-  @Field(() => [User], { description: 'The resolved User list' })
-  data: User[];
+  /** HTTP-equivalent status code. Typically 200. */
+  @Field(() => Int)
+  statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar)
   timestamp: Date;
+
+  /** The resolved array of User entities. Empty array when no users exist. */
+  @Field(() => [User], { description: 'The resolved User list' })
+  data: User[];
 }

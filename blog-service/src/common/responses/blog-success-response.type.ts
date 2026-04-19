@@ -18,16 +18,15 @@ import { DateTimeScalar } from "../graphql/scalars";
  *
  * GraphQL schema:
  *   type BlogSuccessResponse {
- *     statusCode: Int!   success: Boolean!   message: String!
- *     data: Blog!   timestamp: DateTime!
+ *     success:    Boolean!
+ *     message:    String!
+ *     statusCode: Int!
+ *     timestamp:  DateTime!
+ *     data:       Blog!
  *   }
  */
 @ObjectType({ description: "Success response wrapping a single Blog entity" })
 export class BlogSuccessResponse {
-  /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
-  @Field(() => Int, { description: "HTTP-equivalent status code" })
-  statusCode: number;
-
   /** Always true for BlogSuccessResponse. */
   @Field(() => Boolean, { description: "Always true" })
   success: boolean;
@@ -36,15 +35,19 @@ export class BlogSuccessResponse {
   @Field(() => String, { description: "Human-readable success message" })
   message: string;
 
-  /** The resolved Blog entity — author field is a federation stub { id } in GraphQL. */
-  @Field(() => Blog, { description: "The resolved Blog entity" })
-  data: Blog;
+  /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
+  statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar, {
     description: "Server-side response timestamp",
   })
   timestamp: Date;
+
+  /** The resolved Blog entity — author field is a federation stub { id } in GraphQL. */
+  @Field(() => Blog, { description: "The resolved Blog entity" })
+  data: Blog;
 }
 
 /**
@@ -60,18 +63,17 @@ export class BlogSuccessResponse {
  *
  * GraphQL schema:
  *   type BlogsSuccessResponse {
- *     statusCode: Int!   success: Boolean!   message: String!
- *     data: [Blog!]!   timestamp: DateTime!
+ *     success:    Boolean!
+ *     message:    String!
+ *     statusCode: Int!
+ *     timestamp:  DateTime!
+ *     data:       [Blog!]!
  *   }
  */
 @ObjectType({
   description: "Success response wrapping a list of Blog entities",
 })
 export class BlogsSuccessResponse {
-  /** HTTP-equivalent status code. Typically 200. */
-  @Field(() => Int)
-  statusCode: number;
-
   /** Always true for BlogsSuccessResponse. */
   @Field(() => Boolean)
   success: boolean;
@@ -80,11 +82,15 @@ export class BlogsSuccessResponse {
   @Field(() => String)
   message: string;
 
-  /** The resolved Blog list. Empty array when no blog posts exist. */
-  @Field(() => [Blog], { description: "The resolved Blog list" })
-  data: Blog[];
+  /** HTTP-equivalent status code. Typically 200. */
+  @Field(() => Int)
+  statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
   @Field(() => DateTimeScalar)
   timestamp: Date;
+
+  /** The resolved Blog list. Empty array when no blog posts exist. */
+  @Field(() => [Blog], { description: "The resolved Blog list" })
+  data: Blog[];
 }

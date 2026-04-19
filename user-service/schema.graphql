@@ -36,13 +36,13 @@ union UsersResponse = UsersSuccessResponse | ErrorResponse
 
 """Success response wrapping a list of User entities"""
 type UsersSuccessResponse {
-  statusCode: Int!
   success: Boolean!
   message: String!
+  statusCode: Int!
+  timestamp: DateTime!
 
   """The resolved User list"""
   data: [User!]!
-  timestamp: DateTime!
 }
 
 """
@@ -52,20 +52,20 @@ scalar DateTime
 
 """Returned when an operation fails for any reason"""
 type ErrorResponse {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always false for error responses"""
   success: Boolean!
 
   """Human-readable error summary"""
   message: String!
 
-  """Field-level validation errors (present on status 400 only)"""
-  errors: [FieldError!]
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+
+  """Field-level validation errors (present on status 400 only)"""
+  errors: [FieldError!]
 }
 
 """Returns UserSuccessResponse or ErrorResponse"""
@@ -73,20 +73,20 @@ union UserResponse = UserSuccessResponse | ErrorResponse
 
 """Success response wrapping a single User entity"""
 type UserSuccessResponse {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always true for success responses"""
   success: Boolean!
 
   """Human-readable success message"""
   message: String!
 
-  """The resolved User entity"""
-  data: User!
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+
+  """The resolved User entity"""
+  data: User!
 }
 
 """Arguments for fetching a user by ID"""
