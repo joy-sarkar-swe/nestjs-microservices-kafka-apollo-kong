@@ -1,11 +1,10 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { AppModule } from './app.module';
-import { GqlValidationFilter } from './common/filters/gql-validation.filter';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { IoAdapter } from "@nestjs/platform-socket.io";
+import { AppModule } from "./app.module";
+import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
+import { ResponseInterceptor } from "./common/interceptors/response.interceptor";
 
 /**
  * @bootstrap  (user-service)
@@ -39,10 +38,10 @@ async function bootstrap(): Promise<void> {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'user-service',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "user-service",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
-      consumer: { groupId: 'user-service-group' },
+      consumer: { groupId: "user-service-group" },
     },
   });
 
@@ -53,7 +52,7 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
       transform: true,
       exceptionFactory: (errors) => {
-        const { BadRequestException } = require('@nestjs/common');
+        const { BadRequestException } = require("@nestjs/common");
         return new BadRequestException(errors);
       },
     }),
@@ -63,7 +62,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   // ── Global Filters ───────────────────────────────────────────────────
-  app.useGlobalFilters(new GqlValidationFilter(), new HttpExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.enableCors();
 
@@ -75,8 +74,12 @@ async function bootstrap(): Promise<void> {
   console.log(`   ├─ GraphQL (HTTP)        : http://localhost:${port}/graphql`);
   console.log(`   ├─ GraphQL (WS / gql-ws) : ws://localhost:${port}/graphql`);
   console.log(`   ├─ Socket.IO (/users ns)  : ws://localhost:${port}/users`);
-  console.log(`   └─ REST (Kong)            : http://localhost:${port}/users/*`);
-  console.log(`📨 Kafka consumer            : ${process.env.KAFKA_BROKER || 'localhost:9092'} [user-service-group]`);
+  console.log(
+    `   └─ REST (Kong)            : http://localhost:${port}/users/*`,
+  );
+  console.log(
+    `📨 Kafka consumer            : ${process.env.KAFKA_BROKER || "localhost:9092"} [user-service-group]`,
+  );
 }
 
 bootstrap();

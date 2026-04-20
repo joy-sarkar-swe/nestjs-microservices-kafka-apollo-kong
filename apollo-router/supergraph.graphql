@@ -36,14 +36,14 @@ type BaseResponse
   @join__type(graph: BLOG_SERVICE)
   @join__type(graph: USER_SERVICE)
 {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always true for success responses"""
   success: Boolean!
 
   """Human-readable success message"""
   message: String!
+
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
@@ -87,33 +87,33 @@ union BlogsResponse
 type BlogsSuccessResponse
   @join__type(graph: BLOG_SERVICE)
 {
-  statusCode: Int!
   success: Boolean!
   message: String!
+  statusCode: Int!
+  timestamp: DateTime!
 
   """The resolved Blog list"""
   data: [Blog!]!
-  timestamp: DateTime!
 }
 
 """Success response wrapping a single Blog entity"""
 type BlogSuccessResponse
   @join__type(graph: BLOG_SERVICE)
 {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always true"""
   success: Boolean!
 
   """Human-readable success message"""
   message: String!
 
-  """The resolved Blog entity"""
-  data: Blog!
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+
+  """The resolved Blog entity"""
+  data: Blog!
 }
 
 """Input for creating a new blog post"""
@@ -169,20 +169,20 @@ type ErrorResponse
   @join__type(graph: BLOG_SERVICE)
   @join__type(graph: USER_SERVICE)
 {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always false for error responses"""
   success: Boolean!
 
   """Human-readable error summary"""
   message: String!
 
-  """Field-level validation errors (present on status 400 only)"""
-  errors: [FieldError!]
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+
+  """Field-level validation errors (present on status 400 only)"""
+  errors: [FieldError!]
 }
 
 """A single field-level validation error"""
@@ -366,31 +366,31 @@ union UsersResponse
 type UsersSuccessResponse
   @join__type(graph: USER_SERVICE)
 {
-  statusCode: Int!
   success: Boolean!
   message: String!
+  statusCode: Int!
+  timestamp: DateTime!
 
   """The resolved User list"""
   data: [User!]!
-  timestamp: DateTime!
 }
 
 """Success response wrapping a single User entity"""
 type UserSuccessResponse
   @join__type(graph: USER_SERVICE)
 {
-  """HTTP-equivalent status code"""
-  statusCode: Int!
-
   """Always true for success responses"""
   success: Boolean!
 
   """Human-readable success message"""
   message: String!
 
-  """The resolved User entity"""
-  data: User!
+  """HTTP-equivalent status code"""
+  statusCode: Int!
 
   """Server-side response timestamp"""
   timestamp: DateTime!
+
+  """The resolved User entity"""
+  data: User!
 }
