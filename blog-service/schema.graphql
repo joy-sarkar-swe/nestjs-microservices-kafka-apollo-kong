@@ -2,6 +2,15 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+"""A single field-level validation error"""
+type FieldError {
+  """The input field that failed validation"""
+  field: String!
+
+  """Human-readable description of the failure"""
+  message: String!
+}
+
 """User reference stub (owned by user-service)"""
 type User {
   """User UUID — federation linking key"""
@@ -24,15 +33,6 @@ type Blog {
 
   """Author resolved from user-service via Apollo Federation"""
   author: User
-}
-
-"""A single field-level validation error"""
-type FieldError {
-  """The input field that failed validation"""
-  field: String!
-
-  """Human-readable description of the failure"""
-  message: String!
 }
 
 type Query {

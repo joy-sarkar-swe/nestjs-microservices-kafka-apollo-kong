@@ -1,12 +1,12 @@
 import { Module } from "@nestjs/common";
 import { PubSub } from "graphql-subscriptions";
-import { BlogsService } from "./blogs.service";
+import { UserServiceClient } from "../common/http/user-service.client";
+import { BlogEventsGateway } from "../realtime/blog-events.gateway";
+import { BlogsKafkaController } from "./blogs.kafka.controller";
 import { BlogsResolver } from "./blogs.resolver";
 import { BlogsRestController } from "./blogs.rest.controller";
-import { BlogsKafkaController } from "./blogs.kafka.controller";
+import { BlogsService } from "./blogs.service";
 import { InMemoryBlogRepository } from "./repositories/in-memory-blog.repository";
-import { BlogEventsGateway } from "../realtime/blog-events.gateway";
-import { UserServiceClient } from "../common/http/user-service.client";
 
 /**
  * @module BlogsModule
@@ -63,10 +63,7 @@ import { UserServiceClient } from "../common/http/user-service.client";
     // ── Real-time ─────────────────────────────────────────────────────────
     BlogEventsGateway,
   ],
-  controllers: [
-    BlogsRestController,
-    BlogsKafkaController,
-  ],
+  controllers: [BlogsRestController, BlogsKafkaController],
   exports: [BlogsService],
 })
 export class BlogsModule {}

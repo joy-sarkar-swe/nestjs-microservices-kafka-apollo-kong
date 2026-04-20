@@ -1,26 +1,32 @@
+import { HttpStatus, Inject } from "@nestjs/common";
 import {
-  Resolver, Query, Mutation, Args,
-  ResolveReference, ResolveField, Parent, Subscription,
+  Args,
+  Mutation,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+  ResolveReference,
+  Subscription,
 } from "@nestjs/graphql";
-import { Inject, HttpStatus } from "@nestjs/common";
 import { PubSub } from "graphql-subscriptions";
+import {
+  BaseApiResponse,
+  BaseApiResponseType,
+  BlogResponse,
+  BlogResponseType,
+  BlogsResponse,
+  BlogsResponseType,
+} from "src/common/responses/api-response.union";
+import { ResponseFactory } from "src/common/responses/response.factory";
 import { BlogsService } from "./blogs.service";
-import { Blog, User } from "./entities/blog.entity";
 import {
   CreateBlogInput,
-  UpdateBlogInput,
   DeleteBlogInput,
   GetBlogArgs,
+  UpdateBlogInput,
 } from "./dto/blog.input";
-import {
-  BlogResponse,
-  BlogsResponse,
-  BaseApiResponse,
-  BlogResponseType,
-  BlogsResponseType,
-  BaseApiResponseType,
-} from "../common/responses/api-response.union";
-import { ResponseFactory } from "../common/responses/response.factory";
+import { Blog, User } from "./entities/blog.entity";
 
 /**
  * @resolver BlogsResolver
@@ -101,7 +107,8 @@ export class BlogsResolver {
    * @returns {User} A minimal User reference object containing only the federation @key.
    */
   @ResolveField(() => User, {
-    description: "Author resolved from user-service via Apollo Federation _entities",
+    description:
+      "Author resolved from user-service via Apollo Federation _entities",
   })
   author(@Parent() blog: Blog): User {
     return { id: blog.authorId };
@@ -118,12 +125,19 @@ export class BlogsResolver {
    * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse.
    */
   @Mutation(() => BlogResponse, {
-    description: "Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.",
+    description:
+      "Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.",
   })
-  async createBlog(@Args("input") input: CreateBlogInput): Promise<BlogResponseType> {
+  async createBlog(
+    @Args("input") input: CreateBlogInput,
+  ): Promise<BlogResponseType> {
     try {
       const blog = await this.blogsService.create(input);
-      return ResponseFactory.blog(blog, "Blog post created successfully", HttpStatus.CREATED);
+      return ResponseFactory.blog(
+        blog,
+        "Blog post created successfully",
+        HttpStatus.CREATED,
+      );
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -138,9 +152,12 @@ export class BlogsResolver {
    * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse (404).
    */
   @Mutation(() => BlogResponse, {
-    description: "Partially update a blog post. Emits blog.updated Kafka event.",
+    description:
+      "Partially update a blog post. Emits blog.updated Kafka event.",
   })
-  async updateBlog(@Args("input") input: UpdateBlogInput): Promise<BlogResponseType> {
+  async updateBlog(
+    @Args("input") input: UpdateBlogInput,
+  ): Promise<BlogResponseType> {
     try {
       const blog = await this.blogsService.update(input);
       return ResponseFactory.blog(blog, "Blog post updated successfully");
@@ -159,7 +176,9 @@ export class BlogsResolver {
   @Mutation(() => BaseApiResponse, {
     description: "Delete a blog post. Emits blog.deleted Kafka event.",
   })
-  async deleteBlog(@Args("input") input: DeleteBlogInput): Promise<BaseApiResponseType> {
+  async deleteBlog(
+    @Args("input") input: DeleteBlogInput,
+  ): Promise<BaseApiResponseType> {
     try {
       await this.blogsService.delete(input);
       return ResponseFactory.deleted("Blog post deleted successfully");
@@ -210,7 +229,8 @@ export class BlogsResolver {
    * @returns {AsyncIterator} Async iterator over the 'blogDeleted' PubSub channel.
    */
   @Subscription(() => String, {
-    description: "Real-time push when a blog post is deleted. Returns the deleted blog id.",
+    description:
+      "Real-time push when a blog post is deleted. Returns the deleted blog id.",
     resolve: (payload) => payload.blogDeleted,
   })
   blogDeleted() {
@@ -230,7 +250,10 @@ export class BlogsResolver {
    * @throws {NotFoundException} If the referenced blog no longer exists.
    */
   @ResolveReference()
-  async resolveReference(reference: { __typename: string; id: string }): Promise<Blog> {
+  async resolveReference(reference: {
+    __typename: string;
+    id: string;
+  }): Promise<Blog> {
     return this.blogsService.resolveReference(reference);
   }
 }
