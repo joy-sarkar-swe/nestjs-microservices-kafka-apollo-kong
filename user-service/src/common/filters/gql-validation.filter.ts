@@ -1,9 +1,9 @@
-import { Catch, ArgumentsHost } from '@nestjs/common';
-import { GqlExceptionFilter, GqlArgumentsHost } from '@nestjs/graphql';
-import { BadRequestException } from '@nestjs/common';
-import { transformValidationErrors } from '../validators/validation.util';
-import { ResponseFactory } from '../responses/response.factory';
-import { FieldError } from '../responses/field-error.type';
+import { Catch, ArgumentsHost } from "@nestjs/common";
+import { GqlExceptionFilter, GqlArgumentsHost } from "@nestjs/graphql";
+import { BadRequestException } from "@nestjs/common";
+import { transformValidationErrors } from "../validators/validation.util";
+import { ResponseFactory } from "../responses/response.factory";
+import { FieldError } from "../responses/field-error.type";
 
 /**
  * @filter GqlValidationFilter
@@ -62,22 +62,22 @@ export class GqlValidationFilter implements GqlExceptionFilter {
 
       // Detect if the array contains class-validator ValidationError objects
       // (they have a `constraints` or `children` property) vs plain strings.
-      if (rawErrors.length > 0 && typeof rawErrors[0] === 'object') {
+      if (rawErrors.length > 0 && typeof rawErrors[0] === "object") {
         // Full ValidationError objects — transform them
         fieldErrors = transformValidationErrors(rawErrors);
       } else {
         // Plain string array — wrap each as a FieldError with unknown field
         fieldErrors = rawErrors.map((msg: string) => {
           const fe = new FieldError();
-          fe.field = 'unknown';
+          fe.field = "unknown";
           fe.message = msg;
           return fe;
         });
       }
-    } else if (typeof exceptionResponse?.message === 'string') {
+    } else if (typeof exceptionResponse?.message === "string") {
       // Single string message — wrap as a FieldError
       const fe = new FieldError();
-      fe.field = 'unknown';
+      fe.field = "unknown";
       fe.message = exceptionResponse.message;
       fieldErrors = [fe];
     }

@@ -1,4 +1,4 @@
-import { User } from '../entities/user.entity';
+import { User } from "../entities/user.entity";
 
 /**
  * @interface UserRepository
@@ -65,7 +65,7 @@ export interface UserRepository {
    * @param data - Partial User fields to overwrite.
    * @returns The fully updated User record.
    */
-  update(id: string, data: Partial<Pick<User, 'name' | 'email'>>): Promise<User>;
+  update(id: string, data: Partial<Pick<User, "name" | "email">>): Promise<User>;
 
   /**
    * Remove a User from the store.

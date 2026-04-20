@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { User } from '../entities/user.entity';
-import { UserRepository } from './user.repository.interface';
+import { Injectable } from "@nestjs/common";
+import { User } from "../entities/user.entity";
+import { UserRepository } from "./user.repository.interface";
 
 /**
  * @repository InMemoryUserRepository
@@ -85,7 +85,7 @@ export class InMemoryUserRepository implements UserRepository {
    * @returns {Promise<User>} The fully merged, updated User record.
    * @throws {Error} If the id does not exist in the store (should be pre-checked by the service).
    */
-  async update(id: string, data: Partial<Pick<User, 'name' | 'email'>>): Promise<User> {
+  async update(id: string, data: Partial<Pick<User, "name" | "email">>): Promise<User> {
     const existing = this.store.get(id);
     if (!existing) {
       // This should never be called without prior existence check in the service.

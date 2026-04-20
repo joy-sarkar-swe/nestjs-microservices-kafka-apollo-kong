@@ -3,13 +3,13 @@ import {
   NotFoundException,
   OnModuleInit,
   Inject,
-} from '@nestjs/common';
-import { Client, ClientKafka, Transport } from '@nestjs/microservices';
-import { v4 as uuidv4 } from 'uuid';
-import { Blog } from './entities/blog.entity';
-import { CreateBlogInput, UpdateBlogInput, DeleteBlogInput } from './dto/blog.input';
-import { BlogRepository } from './repositories/blog.repository.interface';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
+} from "@nestjs/common";
+import { Client, ClientKafka, Transport } from "@nestjs/microservices";
+import { v4 as uuidv4 } from "uuid";
+import { Blog } from "./entities/blog.entity";
+import { CreateBlogInput, UpdateBlogInput, DeleteBlogInput } from "./dto/blog.input";
+import { BlogRepository } from "./repositories/blog.repository.interface";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
 
 /**
  * @service BlogsService
@@ -53,8 +53,8 @@ export class BlogsService implements OnModuleInit {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'blog-service-producer',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "blog-service-producer",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
       producer: { allowAutoTopicCreation: true },
     },
@@ -67,7 +67,7 @@ export class BlogsService implements OnModuleInit {
    * never imports InMemoryBlogRepository or any DB-specific class directly.
    */
   constructor(
-    @Inject('BLOG_REPOSITORY')
+    @Inject("BLOG_REPOSITORY")
     private readonly repo: BlogRepository,
   ) {}
 
@@ -132,7 +132,7 @@ export class BlogsService implements OnModuleInit {
     };
 
     const saved = await this.repo.create(blog);
-    this.publish<Blog>('blog.created', saved);
+    this.publish<Blog>("blog.created", saved);
     return saved;
   }
 
@@ -149,12 +149,12 @@ export class BlogsService implements OnModuleInit {
   async update(input: UpdateBlogInput): Promise<Blog> {
     await this.findOne(input.id); // throws 404
 
-    const patch: Partial<Pick<Blog, 'title' | 'content'>> = {};
+    const patch: Partial<Pick<Blog, "title" | "content">> = {};
     if (input.title   !== undefined) patch.title   = input.title;
     if (input.content !== undefined) patch.content = input.content;
 
     const updated = await this.repo.update(input.id, patch);
-    this.publish<Blog>('blog.updated', updated);
+    this.publish<Blog>("blog.updated", updated);
     return updated;
   }
 
@@ -170,7 +170,7 @@ export class BlogsService implements OnModuleInit {
   async delete(input: DeleteBlogInput): Promise<void> {
     await this.findOne(input.id); // throws 404
     await this.repo.delete(input.id);
-    this.publish<{ id: string }>('blog.deleted', { id: input.id });
+    this.publish<{ id: string }>("blog.deleted", { id: input.id });
   }
 
   // ── CROSS-SERVICE ─────────────────────────────────────────────────────────
@@ -192,9 +192,9 @@ export class BlogsService implements OnModuleInit {
 
     for (const blog of orphaned) {
       await this.repo.delete(blog.id);
-      this.publish('blog.deleted', {
+      this.publish("blog.deleted", {
         id: blog.id,
-        reason: 'author_deleted',
+        reason: "author_deleted",
         authorId: userId,
       });
     }
@@ -247,7 +247,7 @@ export class BlogsService implements OnModuleInit {
     };
 
     this.kafkaClient.emit(topic, {
-      key:   (payload as any).id ?? 'unknown',
+      key:   (payload as any).id ?? "unknown",
       value: JSON.stringify(event),
     });
   }

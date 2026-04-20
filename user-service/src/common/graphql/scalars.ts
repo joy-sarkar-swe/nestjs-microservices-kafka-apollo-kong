@@ -16,4 +16,4 @@
  *
  * Wire format: ISO 8601 string  e.g. "2025-04-16T10:30:00.000Z"
  */
-export { DateTimeResolver as DateTimeScalar } from 'graphql-scalars';
+export { DateTimeResolver as DateTimeScalar } from "graphql-scalars";

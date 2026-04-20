@@ -1,9 +1,9 @@
-import { Controller, Logger, Inject } from '@nestjs/common';
-import { EventPattern, Payload, Ctx, KafkaContext, Client, ClientKafka, Transport } from '@nestjs/microservices';
-import { PubSub } from 'graphql-subscriptions';
-import { UserEventsGateway } from '../realtime/user-events.gateway';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
-import { User } from './entities/user.entity';
+import { Controller, Logger, Inject } from "@nestjs/common";
+import { EventPattern, Payload, Ctx, KafkaContext, Client, ClientKafka, Transport } from "@nestjs/microservices";
+import { PubSub } from "graphql-subscriptions";
+import { UserEventsGateway } from "../realtime/user-events.gateway";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
+import { User } from "./entities/user.entity";
 
 /**
  * @controller UsersKafkaController
@@ -48,8 +48,8 @@ export class UsersKafkaController {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'user-service-dlq-producer',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "user-service-dlq-producer",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
       producer: { allowAutoTopicCreation: true },
     },
@@ -57,7 +57,7 @@ export class UsersKafkaController {
   private dlqClient: ClientKafka;
 
   constructor(
-    @Inject('GQL_PUB_SUB') private readonly pubSub: PubSub,
+    @Inject("GQL_PUB_SUB") private readonly pubSub: PubSub,
     private readonly gateway: UserEventsGateway,
   ) {}
 
@@ -72,7 +72,7 @@ export class UsersKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context providing topic and partition metadata.
    * @returns {Promise<void>}
    */
-  @EventPattern('user.created')
+  @EventPattern("user.created")
   async handleUserCreated(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -87,14 +87,14 @@ export class UsersKafkaController {
       );
 
       // ── Trigger GraphQL subscription push ───────────────────────────────
-      await this.pubSub.publish('userCreated', { userCreated: event.payload });
+      await this.pubSub.publish("userCreated", { userCreated: event.payload });
 
       // ── Trigger Socket.IO push to REST clients ──────────────────────────
       this.gateway.emitUserCreated(event);
 
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('user.created', raw, err, ctx);
+      this.sendToDlq("user.created", raw, err, ctx);
     }
   }
 
@@ -109,7 +109,7 @@ export class UsersKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {Promise<void>}
    */
-  @EventPattern('user.updated')
+  @EventPattern("user.updated")
   async handleUserUpdated(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -123,11 +123,11 @@ export class UsersKafkaController {
         `[user.updated] correlationId=${event.correlationId} id=${event.payload?.id}`,
       );
 
-      await this.pubSub.publish('userUpdated', { userUpdated: event.payload });
+      await this.pubSub.publish("userUpdated", { userUpdated: event.payload });
       this.gateway.emitUserUpdated(event);
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('user.updated', raw, err, ctx);
+      this.sendToDlq("user.updated", raw, err, ctx);
     }
   }
 
@@ -142,7 +142,7 @@ export class UsersKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {Promise<void>}
    */
-  @EventPattern('user.deleted')
+  @EventPattern("user.deleted")
   async handleUserDeleted(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -156,11 +156,11 @@ export class UsersKafkaController {
         `[user.deleted] correlationId=${event.correlationId} id=${event.payload?.id}`,
       );
 
-      await this.pubSub.publish('userDeleted', { userDeleted: event.payload?.id });
+      await this.pubSub.publish("userDeleted", { userDeleted: event.payload?.id });
       this.gateway.emitUserDeleted(event);
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('user.deleted', raw, err, ctx);
+      this.sendToDlq("user.deleted", raw, err, ctx);
     }
   }
 
@@ -177,11 +177,11 @@ export class UsersKafkaController {
    */
   private parseEnvelope<T>(raw: any): KafkaEvent<T> | null {
     try {
-      const str = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      const str = typeof raw === "string" ? raw : JSON.stringify(raw);
       const parsed = JSON.parse(str);
       // Minimal envelope validation
       if (!parsed.correlationId || !parsed.eventType || !parsed.payload) {
-        this.logger.warn('Received malformed KafkaEvent — missing required fields');
+        this.logger.warn("Received malformed KafkaEvent — missing required fields");
         return null;
       }
       return parsed as KafkaEvent<T>;
@@ -238,7 +238,7 @@ export class UsersKafkaController {
     const errorMessage = err instanceof Error ? err.message : String(err);
     this.logger.error(`[DLQ] Processing failed for topic=${topic} error=${errorMessage}`);
 
-    this.dlqClient.emit('user.events.dlq', {
+    this.dlqClient.emit("user.events.dlq", {
       key: topic,
       value: JSON.stringify({
         originalTopic: topic,

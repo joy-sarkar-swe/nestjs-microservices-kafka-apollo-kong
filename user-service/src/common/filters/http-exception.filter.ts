@@ -9,8 +9,8 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-} from '@nestjs/common';
-import type { Request, Response } from 'express';
+} from "@nestjs/common";
+import type { Request, Response } from "express";
 
 /**
  * HttpExceptionFilter is responsible for processing exceptions and formatting the API's error responses.
@@ -30,7 +30,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     // Skip if not an HTTP request (e.g., GraphQL or Kafka)
-    if (!request || !response || typeof response.status !== 'function') {
+    if (!request || !response || typeof response.status !== "function") {
       return;
     }
 
@@ -39,35 +39,35 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    let message = 'Internal server error';
+    let message = "Internal server error";
     let errors: { field: string; message: string }[] | undefined;
     let error: string | undefined;
 
     /* Validation-pipe errors arrive as a raw array or wrapped in HttpException */
     if (Array.isArray(exception)) {
       status = HttpStatus.BAD_REQUEST;
-      message = 'Validation failed';
+      message = "Validation failed";
       errors = this.formatValidationErrors(exception);
     } else if (exception instanceof HttpException) {
       const body = exception.getResponse();
       let isRouteNotFound = false;
 
-      if (typeof body === 'string') {
+      if (typeof body === "string") {
         message = body;
         error = body;
-        isRouteNotFound = body.startsWith('Cannot ');
+        isRouteNotFound = body.startsWith("Cannot ");
       } else if (Array.isArray(body)) {
         status = HttpStatus.BAD_REQUEST;
-        message = 'Validation failed';
+        message = "Validation failed";
         errors = this.formatValidationErrors(body);
-      } else if (body && typeof body === 'object') {
+      } else if (body && typeof body === "object") {
         const obj = body as Record<string, unknown>;
         message = (obj.message as string) || message;
         error = obj.error as string | undefined;
         
         if (Array.isArray(obj.message)) {
           errors = this.formatValidationErrors(obj.message);
-          message = 'Validation failed';
+          message = "Validation failed";
         } else {
           errors =
             (obj.errors as { field: string; message: string }[] | undefined) ||
@@ -75,12 +75,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
 
         isRouteNotFound =
-          typeof obj.message === 'string' && obj.message.startsWith('Cannot ');
+          typeof obj.message === "string" && obj.message.startsWith("Cannot ");
       }
 
       if (status === (HttpStatus.NOT_FOUND as number) && isRouteNotFound) {
-        message = 'Path not found';
-        error = 'Path not found';
+        message = "Path not found";
+        error = "Path not found";
       }
     }
 
@@ -88,7 +88,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       success: false,
       message,
       method: request?.method,
-      endpoint: request?.originalUrl || request?.url || '',
+      endpoint: request?.originalUrl || request?.url || "",
       statusCode: status,
       timestamp: new Date().toISOString(),
       ...(errors && { errors }),
@@ -100,12 +100,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   private formatValidationErrors(errors: any[]): { field: string; message: string }[] {
     return errors.flatMap((err) => {
-      const field: string = err.property || 'unknown';
+      const field: string = err.property || "unknown";
       const constraints: string[] = err.constraints
         ? Object.values(err.constraints as Record<string, string>)
-        : typeof err === 'string' 
+        : typeof err === "string" 
           ? [err]
-          : ['Invalid value'];
+          : ["Invalid value"];
       return constraints.map((msg) => ({ field, message: msg }));
     });
   }

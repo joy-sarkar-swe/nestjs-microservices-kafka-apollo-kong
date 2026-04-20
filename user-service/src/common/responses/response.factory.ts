@@ -1,9 +1,9 @@
-import { HttpStatus } from '@nestjs/common';
-import { ErrorResponse } from './error-response.type';
-import { BaseResponse } from './base-response.type';
-import { UserSuccessResponse, UsersSuccessResponse } from './user-success-response.type';
-import { FieldError } from './field-error.type';
-import { User } from '../../users/entities/user.entity';
+import { HttpStatus } from "@nestjs/common";
+import { ErrorResponse } from "./error-response.type";
+import { BaseResponse } from "./base-response.type";
+import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type";
+import { FieldError } from "./field-error.type";
+import { User } from "../../users/entities/user.entity";
 
 /**
  * @factory ResponseFactory
@@ -53,7 +53,7 @@ export class ResponseFactory {
    */
   static user(
     data: User,
-    message = 'Success',
+    message = "Success",
     statusCode: number = HttpStatus.OK,
   ): UserSuccessResponse {
     const r = new UserSuccessResponse();
@@ -75,7 +75,7 @@ export class ResponseFactory {
    */
   static users(
     data: User[],
-    message = 'Success',
+    message = "Success",
     statusCode: number = HttpStatus.OK,
   ): UsersSuccessResponse {
     const r = new UsersSuccessResponse();
@@ -94,7 +94,7 @@ export class ResponseFactory {
    *
    * @param message - Human-readable confirmation.
    */
-  static deleted(message = 'Deleted successfully'): BaseResponse {
+  static deleted(message = "Deleted successfully"): BaseResponse {
     const r = new BaseResponse();
     r.statusCode = HttpStatus.OK;
     r.success = true;
@@ -115,7 +115,7 @@ export class ResponseFactory {
    */
   static validationError(
     errors: FieldError[],
-    message = 'Validation failed',
+    message = "Validation failed",
   ): ErrorResponse {
     const r = new ErrorResponse();
     r.statusCode = HttpStatus.BAD_REQUEST;
@@ -165,7 +165,7 @@ export class ResponseFactory {
    *
    * @param message - Safe, generic description of the failure.
    */
-  static internalError(message = 'An unexpected error occurred'): ErrorResponse {
+  static internalError(message = "An unexpected error occurred"): ErrorResponse {
     const r = new ErrorResponse();
     r.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     r.success = false;
@@ -191,7 +191,7 @@ export class ResponseFactory {
    */
   static fromException(error: any): ErrorResponse {
     const status: number = error?.status ?? error?.statusCode ?? 500;
-    const message: string = error?.message ?? 'An unexpected error occurred';
+    const message: string = error?.message ?? "An unexpected error occurred";
 
     switch (status) {
       case HttpStatus.NOT_FOUND:

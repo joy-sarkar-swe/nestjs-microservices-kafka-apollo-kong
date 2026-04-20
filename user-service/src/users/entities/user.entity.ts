@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID, Directive } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Directive } from "@nestjs/graphql";
 
 /**
  * @entity User
@@ -20,18 +20,18 @@ import { ObjectType, Field, ID, Directive } from '@nestjs/graphql';
  *     email: String!
  *   }
  */
-@ObjectType({ description: 'A registered user in the system' })
-@Directive('@key(fields: "id")')
+@ObjectType({ description: "A registered user in the system" })
+@Directive("@key(fields: \"id\")")
 export class User {
   /** UUID v4 primary key — Apollo Federation @key. */
-  @Field(() => ID, { description: 'Unique user identifier (UUID v4)' })
+  @Field(() => ID, { description: "Unique user identifier (UUID v4)" })
   id: string;
 
   /** Full display name. */
-  @Field(() => String, { description: 'Full display name' })
+  @Field(() => String, { description: "Full display name" })
   name: string;
 
   /** Unique email address. */
-  @Field(() => String, { description: 'Unique email address' })
+  @Field(() => String, { description: "Unique email address" })
   email: string;
 }

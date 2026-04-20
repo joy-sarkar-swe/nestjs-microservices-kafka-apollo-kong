@@ -1,7 +1,7 @@
-import { createUnionType } from '@nestjs/graphql';
-import { ErrorResponse } from './error-response.type';
-import { BaseResponse } from './base-response.type';
-import { UserSuccessResponse, UsersSuccessResponse } from './user-success-response.type';
+import { createUnionType } from "@nestjs/graphql";
+import { ErrorResponse } from "./error-response.type";
+import { BaseResponse } from "./base-response.type";
+import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type";
 
 /**
  * @union UserResponse
@@ -23,8 +23,8 @@ import { UserSuccessResponse, UsersSuccessResponse } from './user-success-respon
  * ```
  */
 export const UserResponse = createUnionType({
-  name: 'UserResponse',
-  description: 'Returns UserSuccessResponse or ErrorResponse',
+  name: "UserResponse",
+  description: "Returns UserSuccessResponse or ErrorResponse",
   types: () => [UserSuccessResponse, ErrorResponse] as const,
   /**
    * Determines the concrete GraphQL type at query-time by inspecting
@@ -49,8 +49,8 @@ export const UserResponse = createUnionType({
  *   - {@link ErrorResponse}        — operation failed.
  */
 export const UsersResponse = createUnionType({
-  name: 'UsersResponse',
-  description: 'Returns UsersSuccessResponse or ErrorResponse',
+  name: "UsersResponse",
+  description: "Returns UsersSuccessResponse or ErrorResponse",
   types: () => [UsersSuccessResponse, ErrorResponse] as const,
   /**
    * Determines the concrete GraphQL type at query-time.
@@ -77,8 +77,8 @@ export const UsersResponse = createUnionType({
  *   - {@link ErrorResponse} — operation failed (e.g. user not found).
  */
 export const BaseApiResponse = createUnionType({
-  name: 'BaseApiResponse',
-  description: 'Returns BaseResponse or ErrorResponse',
+  name: "BaseApiResponse",
+  description: "Returns BaseResponse or ErrorResponse",
   types: () => [BaseResponse, ErrorResponse] as const,
   /**
    * Determines the concrete GraphQL type at query-time.

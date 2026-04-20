@@ -1,11 +1,19 @@
-import { Controller, Logger, Inject } from '@nestjs/common';
-import { EventPattern, Payload, Ctx, KafkaContext, Client, ClientKafka, Transport } from '@nestjs/microservices';
-import { PubSub } from 'graphql-subscriptions';
-import { BlogsService } from './blogs.service';
-import { BlogEventsGateway } from '../realtime/blog-events.gateway';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
-import { Blog } from './entities/blog.entity';
-import { UserServiceClient } from '../common/http/user-service.client';
+import { Controller, Inject, Logger } from "@nestjs/common";
+import {
+  Client,
+  ClientKafka,
+  Ctx,
+  EventPattern,
+  KafkaContext,
+  Payload,
+  Transport,
+} from "@nestjs/microservices";
+import { PubSub } from "graphql-subscriptions";
+import { UserServiceClient } from "../common/http/user-service.client";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
+import { BlogEventsGateway } from "../realtime/blog-events.gateway";
+import { BlogsService } from "./blogs.service";
+import { Blog } from "./entities/blog.entity";
 
 /**
  * @controller BlogsKafkaController
@@ -58,8 +66,8 @@ export class BlogsKafkaController {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'blog-service-dlq-producer',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "blog-service-dlq-producer",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
       producer: { allowAutoTopicCreation: true },
     },
@@ -68,7 +76,7 @@ export class BlogsKafkaController {
 
   constructor(
     private readonly blogsService: BlogsService,
-    @Inject('GQL_PUB_SUB') private readonly pubSub: PubSub,
+    @Inject("GQL_PUB_SUB") private readonly pubSub: PubSub,
     private readonly gateway: BlogEventsGateway,
     private readonly userClient: UserServiceClient,
   ) {}
@@ -84,7 +92,7 @@ export class BlogsKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context (topic, partition metadata).
    * @returns {Promise<void>}
    */
-  @EventPattern('blog.created')
+  @EventPattern("blog.created")
   async handleBlogCreated(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -99,14 +107,14 @@ export class BlogsKafkaController {
       );
 
       // Push to GraphQL subscribers
-      await this.pubSub.publish('blogCreated', { blogCreated: event.payload });
+      await this.pubSub.publish("blogCreated", { blogCreated: event.payload });
 
       // Push to Socket.IO REST clients
       this.gateway.emitBlogCreated(event);
 
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('blog.created', raw, err, ctx);
+      this.sendToDlq("blog.created", raw, err, ctx);
     }
   }
 
@@ -118,7 +126,7 @@ export class BlogsKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {Promise<void>}
    */
-  @EventPattern('blog.updated')
+  @EventPattern("blog.updated")
   async handleBlogUpdated(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -132,11 +140,11 @@ export class BlogsKafkaController {
         `[blog.updated] correlationId=${event.correlationId} id=${event.payload?.id}`,
       );
 
-      await this.pubSub.publish('blogUpdated', { blogUpdated: event.payload });
+      await this.pubSub.publish("blogUpdated", { blogUpdated: event.payload });
       this.gateway.emitBlogUpdated(event);
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('blog.updated', raw, err, ctx);
+      this.sendToDlq("blog.updated", raw, err, ctx);
     }
   }
 
@@ -148,7 +156,7 @@ export class BlogsKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {Promise<void>}
    */
-  @EventPattern('blog.deleted')
+  @EventPattern("blog.deleted")
   async handleBlogDeleted(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -160,16 +168,18 @@ export class BlogsKafkaController {
     try {
       const reason = (event.payload as any).reason
         ? ` (reason: ${(event.payload as any).reason})`
-        : '';
+        : "";
       this.logger.log(
         `[blog.deleted] correlationId=${event.correlationId} id=${event.payload?.id}${reason}`,
       );
 
-      await this.pubSub.publish('blogDeleted', { blogDeleted: event.payload?.id });
+      await this.pubSub.publish("blogDeleted", {
+        blogDeleted: event.payload?.id,
+      });
       this.gateway.emitBlogDeleted(event);
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('blog.deleted', raw, err, ctx);
+      this.sendToDlq("blog.deleted", raw, err, ctx);
     }
   }
 
@@ -181,14 +191,15 @@ export class BlogsKafkaController {
    * Extensible: pre-warm cache, trigger analytics, etc.
    *
    * @param {any} raw - Raw Kafka message payload.
-   * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {void}
    */
-  @EventPattern('user.created')
-  handleUserCreated(@Payload() raw: any, @Ctx() ctx: KafkaContext): void {
+  @EventPattern("user.created")
+  handleUserCreated(@Payload() raw: any): void {
     const event = this.parseEnvelope<{ id: string }>(raw);
     if (!event) return;
-    this.logger.log(`[user.created] correlationId=${event?.correlationId} id=${event?.payload?.id}`);
+    this.logger.log(
+      `[user.created] correlationId=${event?.correlationId} id=${event?.payload?.id}`,
+    );
     // Extend: pre-warm author name cache, analytics hook, etc.
   }
 
@@ -198,14 +209,15 @@ export class BlogsKafkaController {
    * blog requests reflect the latest user data.
    *
    * @param {any} raw - Raw Kafka message payload.
-   * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {void}
    */
-  @EventPattern('user.updated')
-  handleUserUpdated(@Payload() raw: any, @Ctx() ctx: KafkaContext): void {
+  @EventPattern("user.updated")
+  handleUserUpdated(@Payload() raw: any): void {
     const event = this.parseEnvelope<{ id: string }>(raw);
     if (!event) return;
-    this.logger.log(`[user.updated] correlationId=${event?.correlationId} id=${event?.payload?.id}`);
+    this.logger.log(
+      `[user.updated] correlationId=${event?.correlationId} id=${event?.payload?.id}`,
+    );
     // Evict stale author data from the REST cache
     if (event.payload?.id) {
       this.userClient.evictCache(event.payload.id);
@@ -230,7 +242,7 @@ export class BlogsKafkaController {
    * @param {KafkaContext} ctx - Kafka execution context.
    * @returns {Promise<void>}
    */
-  @EventPattern('user.deleted')
+  @EventPattern("user.deleted")
   async handleUserDeleted(
     @Payload() raw: any,
     @Ctx() ctx: KafkaContext,
@@ -252,7 +264,7 @@ export class BlogsKafkaController {
       }
       this.markProcessed(event.correlationId);
     } catch (err) {
-      this.sendToDlq('user.deleted', raw, err, ctx);
+      this.sendToDlq("user.deleted", raw, err, ctx);
     }
   }
 
@@ -269,15 +281,19 @@ export class BlogsKafkaController {
    */
   private parseEnvelope<T>(raw: any): KafkaEvent<T> | null {
     try {
-      const str = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      const str = typeof raw === "string" ? raw : JSON.stringify(raw);
       const parsed = JSON.parse(str);
       if (!parsed.correlationId || !parsed.eventType || !parsed.payload) {
-        this.logger.warn('Received malformed KafkaEvent — missing required fields');
+        this.logger.warn(
+          "Received malformed KafkaEvent — missing required fields",
+        );
         return null;
       }
       return parsed as KafkaEvent<T>;
     } catch {
-      this.logger.warn(`Failed to parse Kafka message: ${String(raw).slice(0, 200)}`);
+      this.logger.warn(
+        `Failed to parse Kafka message: ${String(raw).slice(0, 200)}`,
+      );
       return null;
     }
   }
@@ -291,7 +307,9 @@ export class BlogsKafkaController {
    */
   private isDuplicate(correlationId: string): boolean {
     if (this.processedCorrelationIds.has(correlationId)) {
-      this.logger.warn(`Duplicate Kafka event skipped — correlationId=${correlationId}`);
+      this.logger.warn(
+        `Duplicate Kafka event skipped — correlationId=${correlationId}`,
+      );
       return true;
     }
     return false;
@@ -329,9 +347,11 @@ export class BlogsKafkaController {
     ctx: KafkaContext,
   ): void {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    this.logger.error(`[DLQ] Processing failed topic=${topic} error=${errorMessage}`);
+    this.logger.error(
+      `[DLQ] Processing failed topic=${topic} error=${errorMessage}`,
+    );
 
-    this.dlqClient.emit('blog.events.dlq', {
+    this.dlqClient.emit("blog.events.dlq", {
       key: topic,
       value: JSON.stringify({
         originalTopic: topic,

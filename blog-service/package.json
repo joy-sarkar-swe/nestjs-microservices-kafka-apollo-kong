@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "description": "NestJS Blog Microservice — Repository Pattern + Apollo Federation v2 + Kafka + REST + Realtime",
   "private": true,
+  "type": "module",
   "license": "MIT",
   "scripts": {
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "lint": "eslint 'src/**/*.ts' --fix"
   },
   "dependencies": {
     "@apollo/server": "^5.5.0",
@@ -39,11 +41,15 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/schematics": "^11.1.0",
-    "@types/node": "^22.19.17",
+    "@types/node": "^25.6.0",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.14",
-    "typescript": "^5.9.3"
+    "eslint": "^10.2.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "typescript": "^6.0.3"
   }
 }

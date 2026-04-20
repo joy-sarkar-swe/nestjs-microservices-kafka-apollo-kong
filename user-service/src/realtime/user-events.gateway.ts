@@ -1,14 +1,14 @@
+import { Logger } from "@nestjs/common";
 import {
-  WebSocketGateway,
-  WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
-} from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
-import { User } from '../users/entities/user.entity';
+  WebSocketGateway,
+  WebSocketServer,
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
+import { User } from "../users/entities/user.entity";
 
 /**
  * @gateway UserEventsGateway
@@ -45,9 +45,9 @@ import { User } from '../users/entities/user.entity';
  * origin: '*' is acceptable for local demo. Lock down to specific origins in production.
  */
 @WebSocketGateway({
-  cors: { origin: '*' },
-  namespace: '/users',
-  transports: ['websocket', 'polling'],
+  cors: { origin: "*" },
+  namespace: "/users",
+  transports: ["websocket", "polling"],
 })
 export class UserEventsGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -61,11 +61,12 @@ export class UserEventsGateway
    * Called once by the NestJS WebSocket framework after the Socket.IO server
    * has been initialised and is ready to accept connections.
    *
-   * @param {Server} server - The underlying Socket.IO server instance.
    * @returns {void}
    */
-  afterInit(server: Server): void {
-    this.logger.log('UserEventsGateway initialised — Socket.IO /users namespace ready');
+  afterInit(): void {
+    this.logger.log(
+      "UserEventsGateway initialised — Socket.IO /users namespace ready",
+    );
   }
 
   /**
@@ -96,8 +97,10 @@ export class UserEventsGateway
    * @returns {void}
    */
   emitUserCreated(event: KafkaEvent<User>): void {
-    this.server.emit('user:created', event);
-    this.logger.log(`[user:created] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("user:created", event);
+    this.logger.log(
+      `[user:created] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 
   /**
@@ -108,8 +111,10 @@ export class UserEventsGateway
    * @returns {void}
    */
   emitUserUpdated(event: KafkaEvent<User>): void {
-    this.server.emit('user:updated', event);
-    this.logger.log(`[user:updated] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("user:updated", event);
+    this.logger.log(
+      `[user:updated] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 
   /**
@@ -120,7 +125,9 @@ export class UserEventsGateway
    * @returns {void}
    */
   emitUserDeleted(event: KafkaEvent<{ id: string }>): void {
-    this.server.emit('user:deleted', event);
-    this.logger.log(`[user:deleted] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("user:deleted", event);
+    this.logger.log(
+      `[user:deleted] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 }

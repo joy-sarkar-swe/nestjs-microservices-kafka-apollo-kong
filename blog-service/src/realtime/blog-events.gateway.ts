@@ -1,14 +1,14 @@
+import { Logger } from "@nestjs/common";
 import {
-  WebSocketGateway,
-  WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
-} from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
-import { Blog } from '../blogs/entities/blog.entity';
+  WebSocketGateway,
+  WebSocketServer,
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Blog } from "../blogs/entities/blog.entity";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
 
 /**
  * @gateway BlogEventsGateway
@@ -45,9 +45,9 @@ import { Blog } from '../blogs/entities/blog.entity';
  * origin: '*' is acceptable for local demo. Restrict to specific origins in production.
  */
 @WebSocketGateway({
-  cors: { origin: '*' },
-  namespace: '/blogs',
-  transports: ['websocket', 'polling'],
+  cors: { origin: "*" },
+  namespace: "/blogs",
+  transports: ["websocket", "polling"],
 })
 export class BlogEventsGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -61,11 +61,12 @@ export class BlogEventsGateway
    * Called once by the NestJS WebSocket framework after the Socket.IO server
    * has been initialised and is ready to accept connections on the /blogs namespace.
    *
-   * @param {Server} server - The underlying Socket.IO server instance.
    * @returns {void}
    */
-  afterInit(server: Server): void {
-    this.logger.log('BlogEventsGateway initialised — Socket.IO /blogs namespace ready');
+  afterInit(): void {
+    this.logger.log(
+      "BlogEventsGateway initialised — Socket.IO /blogs namespace ready",
+    );
   }
 
   /**
@@ -96,8 +97,10 @@ export class BlogEventsGateway
    * @returns {void}
    */
   emitBlogCreated(event: KafkaEvent<Blog>): void {
-    this.server.emit('blog:created', event);
-    this.logger.log(`[blog:created] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("blog:created", event);
+    this.logger.log(
+      `[blog:created] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 
   /**
@@ -108,8 +111,10 @@ export class BlogEventsGateway
    * @returns {void}
    */
   emitBlogUpdated(event: KafkaEvent<Blog>): void {
-    this.server.emit('blog:updated', event);
-    this.logger.log(`[blog:updated] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("blog:updated", event);
+    this.logger.log(
+      `[blog:updated] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 
   /**
@@ -121,7 +126,9 @@ export class BlogEventsGateway
    * @returns {void}
    */
   emitBlogDeleted(event: KafkaEvent<{ id: string }>): void {
-    this.server.emit('blog:deleted', event);
-    this.logger.log(`[blog:deleted] broadcast — correlationId=${event.correlationId}`);
+    this.server.emit("blog:deleted", event);
+    this.logger.log(
+      `[blog:deleted] broadcast — correlationId=${event.correlationId}`,
+    );
   }
 }

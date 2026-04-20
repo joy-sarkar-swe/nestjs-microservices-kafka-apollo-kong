@@ -1,30 +1,30 @@
+import { HttpStatus, Inject } from "@nestjs/common";
 import {
-  Resolver,
-  Query,
-  Mutation,
   Args,
+  Mutation,
+  Query,
+  Resolver,
   ResolveReference,
   Subscription,
-} from '@nestjs/graphql';
-import { Inject, HttpStatus } from '@nestjs/common';
-import { PubSub } from 'graphql-subscriptions';
-import { UsersService } from './users.service';
-import { User } from './entities/user.entity';
+} from "@nestjs/graphql";
+import { PubSub } from "graphql-subscriptions";
+import {
+  BaseApiResponse,
+  BaseApiResponseType,
+  UserResponse,
+  UserResponseType,
+  UsersResponse,
+  UsersResponseType,
+} from "../common/responses/api-response.union";
+import { ResponseFactory } from "../common/responses/response.factory";
 import {
   CreateUserInput,
-  UpdateUserInput,
   DeleteUserInput,
   GetUserArgs,
-} from './dto/user.input';
-import {
-  UserResponse,
-  UsersResponse,
-  BaseApiResponse,
-  UserResponseType,
-  UsersResponseType,
-  BaseApiResponseType,
-} from '../common/responses/api-response.union';
-import { ResponseFactory } from '../common/responses/response.factory';
+  UpdateUserInput,
+} from "./dto/user.input";
+import { User } from "./entities/user.entity";
+import { UsersService } from "./users.service";
 
 /**
  * @resolver UsersResolver
@@ -59,7 +59,7 @@ import { ResponseFactory } from '../common/responses/response.factory';
 export class UsersResolver {
   constructor(
     private readonly usersService: UsersService,
-    @Inject('GQL_PUB_SUB') private readonly pubSub: PubSub,
+    @Inject("GQL_PUB_SUB") private readonly pubSub: PubSub,
   ) {}
 
   // ── QUERIES ───────────────────────────────────────────────────────────────
@@ -71,13 +71,13 @@ export class UsersResolver {
    *   or an ErrorResponse if the service throws.
    */
   @Query(() => UsersResponse, {
-    name: 'getUsers',
-    description: 'Fetch all users.',
+    name: "getUsers",
+    description: "Fetch all users.",
   })
   async getUsers(): Promise<UsersResponseType> {
     try {
       const users = await this.usersService.findAll();
-      return ResponseFactory.users(users, 'Users retrieved successfully');
+      return ResponseFactory.users(users, "Users retrieved successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -91,13 +91,13 @@ export class UsersResolver {
    * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse.
    */
   @Query(() => UserResponse, {
-    name: 'getUser',
-    description: 'Fetch a single user by UUID.',
+    name: "getUser",
+    description: "Fetch a single user by UUID.",
   })
-  async getUser(@Args('input') input: GetUserArgs): Promise<UserResponseType> {
+  async getUser(@Args("input") input: GetUserArgs): Promise<UserResponseType> {
     try {
       const user = await this.usersService.findOne(input.id);
-      return ResponseFactory.user(user, 'User retrieved successfully');
+      return ResponseFactory.user(user, "User retrieved successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -114,12 +114,19 @@ export class UsersResolver {
    * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse.
    */
   @Mutation(() => UserResponse, {
-    description: 'Create a new user. Emits user.created Kafka event. Subscribers receive push once Kafka consumer fires.',
+    description:
+      "Create a new user. Emits user.created Kafka event. Subscribers receive push once Kafka consumer fires.",
   })
-  async createUser(@Args('input') input: CreateUserInput): Promise<UserResponseType> {
+  async createUser(
+    @Args("input") input: CreateUserInput,
+  ): Promise<UserResponseType> {
     try {
       const user = await this.usersService.create(input);
-      return ResponseFactory.user(user, 'User created successfully', HttpStatus.CREATED);
+      return ResponseFactory.user(
+        user,
+        "User created successfully",
+        HttpStatus.CREATED,
+      );
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -134,12 +141,14 @@ export class UsersResolver {
    * @returns {Promise<UserResponseType>} A UserSuccessResponse or ErrorResponse (404/409).
    */
   @Mutation(() => UserResponse, {
-    description: 'Partially update a user. Emits user.updated Kafka event.',
+    description: "Partially update a user. Emits user.updated Kafka event.",
   })
-  async updateUser(@Args('input') input: UpdateUserInput): Promise<UserResponseType> {
+  async updateUser(
+    @Args("input") input: UpdateUserInput,
+  ): Promise<UserResponseType> {
     try {
       const user = await this.usersService.update(input);
-      return ResponseFactory.user(user, 'User updated successfully');
+      return ResponseFactory.user(user, "User updated successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -155,12 +164,15 @@ export class UsersResolver {
    * @returns {Promise<BaseApiResponseType>} A BaseResponse or ErrorResponse (404).
    */
   @Mutation(() => BaseApiResponse, {
-    description: 'Delete a user. Emits user.deleted Kafka event — blog orphans removed.',
+    description:
+      "Delete a user. Emits user.deleted Kafka event — blog orphans removed.",
   })
-  async deleteUser(@Args('input') input: DeleteUserInput): Promise<BaseApiResponseType> {
+  async deleteUser(
+    @Args("input") input: DeleteUserInput,
+  ): Promise<BaseApiResponseType> {
     try {
       await this.usersService.delete(input);
-      return ResponseFactory.deleted('User deleted successfully');
+      return ResponseFactory.deleted("User deleted successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -181,10 +193,11 @@ export class UsersResolver {
    * @returns {AsyncIterator} Async iterator over the 'userCreated' PubSub channel.
    */
   @Subscription(() => User, {
-    description: 'Real-time push when a user is created (fires after Kafka consumer processes the event).',
+    description:
+      "Real-time push when a user is created (fires after Kafka consumer processes the event).",
   })
   userCreated() {
-    return this.pubSub.asyncIterator('userCreated');
+    return this.pubSub.asyncIterator("userCreated");
   }
 
   /**
@@ -194,10 +207,10 @@ export class UsersResolver {
    * @returns {AsyncIterator} Async iterator over the 'userUpdated' PubSub channel.
    */
   @Subscription(() => User, {
-    description: 'Real-time push when a user is updated.',
+    description: "Real-time push when a user is updated.",
   })
   userUpdated() {
-    return this.pubSub.asyncIterator('userUpdated');
+    return this.pubSub.asyncIterator("userUpdated");
   }
 
   /**
@@ -208,11 +221,12 @@ export class UsersResolver {
    * @returns {AsyncIterator} Async iterator over the 'userDeleted' PubSub channel.
    */
   @Subscription(() => String, {
-    description: 'Real-time push when a user is deleted. Returns the deleted user id.',
+    description:
+      "Real-time push when a user is deleted. Returns the deleted user id.",
     resolve: (payload) => payload.userDeleted,
   })
   userDeleted() {
-    return this.pubSub.asyncIterator('userDeleted');
+    return this.pubSub.asyncIterator("userDeleted");
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
@@ -228,7 +242,10 @@ export class UsersResolver {
    * @throws {NotFoundException} If the referenced user no longer exists.
    */
   @ResolveReference()
-  async resolveReference(reference: { __typename: string; id: string }): Promise<User> {
+  async resolveReference(reference: {
+    __typename: string;
+    id: string;
+  }): Promise<User> {
     return this.usersService.resolveReference(reference);
   }
 }

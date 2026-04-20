@@ -1,6 +1,6 @@
-import { ObjectType, Field, Int, Directive } from '@nestjs/graphql';
-import { DateTimeScalar } from '../graphql/scalars';
-import { FieldError } from './field-error.type';
+import { ObjectType, Field, Int, Directive } from "@nestjs/graphql";
+import { DateTimeScalar } from "../graphql/scalars";
+import { FieldError } from "./field-error.type";
 
 /**
  * @type ErrorResponse
@@ -21,15 +21,15 @@ import { FieldError } from './field-error.type';
  *     timestamp:  DateTime!
  *   }
  */
-@Directive('@shareable')
-@ObjectType({ description: 'Returned when an operation fails for any reason' })
+@Directive("@shareable")
+@ObjectType({ description: "Returned when an operation fails for any reason" })
 export class ErrorResponse {
   /** Always false for ErrorResponse. Enables quick client-side branching. */
-  @Field(() => Boolean, { description: 'Always false for error responses' })
+  @Field(() => Boolean, { description: "Always false for error responses" })
   success: boolean;
 
   /** Top-level human-readable error description. */
-  @Field(() => String, { description: 'Human-readable error summary' })
+  @Field(() => String, { description: "Human-readable error summary" })
   message: string;
 
   /**
@@ -39,11 +39,11 @@ export class ErrorResponse {
    * 409 — conflict (e.g. duplicate email)
    * 500 — unexpected server error
    */
-  @Field(() => Int, { description: 'HTTP-equivalent status code' })
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
   statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  @Field(() => DateTimeScalar, { description: "Server-side response timestamp" })
   timestamp: Date;
 
   /**
@@ -53,7 +53,7 @@ export class ErrorResponse {
    */
   @Field(() => [FieldError], {
     nullable: true,
-    description: 'Field-level validation errors (present on status 400 only)',
+    description: "Field-level validation errors (present on status 400 only)",
   })
   errors?: FieldError[];
 }

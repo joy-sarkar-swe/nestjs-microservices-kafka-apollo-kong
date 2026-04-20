@@ -1,5 +1,5 @@
-import { ObjectType, Field, Int, Directive } from '@nestjs/graphql';
-import { DateTimeScalar } from '../graphql/scalars';
+import { ObjectType, Field, Int, Directive } from "@nestjs/graphql";
+import { DateTimeScalar } from "../graphql/scalars";
 
 /**
  * @type BaseResponse
@@ -19,22 +19,22 @@ import { DateTimeScalar } from '../graphql/scalars';
  *     timestamp:  DateTime!
  *   }
  */
-@Directive('@shareable')
-@ObjectType({ description: 'Generic success confirmation without a data payload' })
+@Directive("@shareable")
+@ObjectType({ description: "Generic success confirmation without a data payload" })
 export class BaseResponse {
   /** HTTP-equivalent status code. Typically 200 or 204. */
-  @Field(() => Int, { description: 'HTTP-equivalent status code' })
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
   statusCode: number;
 
   /** Always true for BaseResponse. */
-  @Field(() => Boolean, { description: 'Always true for success responses' })
+  @Field(() => Boolean, { description: "Always true for success responses" })
   success: boolean;
 
   /** Human-readable confirmation message. */
-  @Field(() => String, { description: 'Human-readable success message' })
+  @Field(() => String, { description: "Human-readable success message" })
   message: string;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  @Field(() => DateTimeScalar, { description: "Server-side response timestamp" })
   timestamp: Date;
 }

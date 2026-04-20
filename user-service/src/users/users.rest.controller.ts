@@ -3,10 +3,10 @@ import {
   Get, Post, Put, Delete,
   Body, Param, Query,
   HttpCode, HttpStatus,
-} from '@nestjs/common';
-import { UsersService } from './users.service';
-import { CreateUserInput, UpdateUserInput } from './dto/user.input';
-import { User } from './entities/user.entity';
+} from "@nestjs/common";
+import { UsersService } from "./users.service";
+import { CreateUserInput, UpdateUserInput } from "./dto/user.input";
+import { User } from "./entities/user.entity";
 
 /**
  * @controller UsersRestController
@@ -31,7 +31,7 @@ import { User } from './entities/user.entity';
  * UserEventsGateway after the Kafka consumer processes the mutation.
  * The REST response is immediate — the Socket.IO push is asynchronous.
  */
-@Controller('users')
+@Controller("users")
 export class UsersRestController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -48,10 +48,10 @@ export class UsersRestController {
    * @returns {Promise<User[]>} Matching User records; empty array when none found.
    */
   @Get()
-  async findAll(@Query('ids') ids?: string): Promise<User[]> {
+  async findAll(@Query("ids") ids?: string): Promise<User[]> {
     if (ids) {
       // Batch fetch — split CSV, resolve each in parallel, filter out nulls
-      const idList = ids.split(',').map((id) => id.trim()).filter(Boolean);
+      const idList = ids.split(",").map((id) => id.trim()).filter(Boolean);
       const results = await Promise.all(
         idList.map((id) => this.usersService.findOne(id).catch(() => null)),
       );
@@ -67,8 +67,8 @@ export class UsersRestController {
    * @returns {Promise<User>} The matching User record.
    * @throws {NotFoundException} 404 when no user exists with the given id.
    */
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<User> {
+  @Get(":id")
+  async findOne(@Param("id") id: string): Promise<User> {
     return this.usersService.findOne(id);
   }
 
@@ -98,10 +98,10 @@ export class UsersRestController {
    * @throws {NotFoundException}  404 when no user exists with the given id.
    * @throws {ConflictException}  409 when the new email is already taken by another user.
    */
-  @Put(':id')
+  @Put(":id")
   async update(
-    @Param('id') id: string,
-    @Body() body: Omit<UpdateUserInput, 'id'>,
+    @Param("id") id: string,
+    @Body() body: Omit<UpdateUserInput, "id">,
   ): Promise<User> {
     return this.usersService.update({ id, ...body });
   }
@@ -116,8 +116,8 @@ export class UsersRestController {
    * @returns {Promise<{ deleted: boolean }>} Confirmation object `{ deleted: true }`.
    * @throws {NotFoundException} 404 when no user exists with the given id.
    */
-  @Delete(':id')
-  async remove(@Param('id') id: string): Promise<{ deleted: boolean }> {
+  @Delete(":id")
+  async remove(@Param("id") id: string): Promise<{ deleted: boolean }> {
     await this.usersService.delete({ id });
     return { deleted: true };
   }

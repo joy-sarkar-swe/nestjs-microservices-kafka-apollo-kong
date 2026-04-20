@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { Blog } from '../entities/blog.entity';
-import { BlogRepository } from './blog.repository.interface';
+import { Injectable } from "@nestjs/common";
+import { Blog } from "../entities/blog.entity";
+import { BlogRepository } from "./blog.repository.interface";
 
 /**
  * @repository InMemoryBlogRepository
@@ -83,7 +83,7 @@ export class InMemoryBlogRepository implements BlogRepository {
    * @returns {Promise<Blog>} The fully merged, updated Blog record.
    * @throws {Error} If the id does not exist in the store (should be pre-checked by the service).
    */
-  async update(id: string, data: Partial<Pick<Blog, 'title' | 'content'>>): Promise<Blog> {
+  async update(id: string, data: Partial<Pick<Blog, "title" | "content">>): Promise<Blog> {
     const existing = this.store.get(id);
     if (!existing) {
       throw new Error(`InMemoryBlogRepository: Blog "${id}" not found during update`);

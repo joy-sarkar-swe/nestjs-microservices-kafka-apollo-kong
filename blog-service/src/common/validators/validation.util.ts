@@ -1,5 +1,5 @@
-import { ValidationError } from 'class-validator';
-import { FieldError } from '../responses/field-error.type';
+import { ValidationError } from "class-validator";
+import { FieldError } from "../responses/field-error.type";
 
 /**
  * @util transformValidationErrors  (blog-service)
@@ -32,7 +32,7 @@ import { FieldError } from '../responses/field-error.type';
  */
 export function transformValidationErrors(
   errors: ValidationError[],
-  prefix = '',
+  prefix = "",
 ): FieldError[] {
   const result: FieldError[] = [];
 

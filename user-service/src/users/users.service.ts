@@ -4,13 +4,13 @@ import {
   ConflictException,
   OnModuleInit,
   Inject,
-} from '@nestjs/common';
-import { Client, ClientKafka, Transport } from '@nestjs/microservices';
-import { v4 as uuidv4 } from 'uuid';
-import { User } from './entities/user.entity';
-import { CreateUserInput, UpdateUserInput, DeleteUserInput } from './dto/user.input';
-import { UserRepository } from './repositories/user.repository.interface';
-import { KafkaEvent } from '../common/kafka/kafka-event.interface';
+} from "@nestjs/common";
+import { Client, ClientKafka, Transport } from "@nestjs/microservices";
+import { v4 as uuidv4 } from "uuid";
+import { User } from "./entities/user.entity";
+import { CreateUserInput, UpdateUserInput, DeleteUserInput } from "./dto/user.input";
+import { UserRepository } from "./repositories/user.repository.interface";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface";
 
 /**
  * @service UsersService
@@ -52,8 +52,8 @@ export class UsersService implements OnModuleInit {
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'user-service-producer',
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        clientId: "user-service-producer",
+        brokers: [process.env.KAFKA_BROKER || "localhost:9092"],
       },
       producer: {
         allowAutoTopicCreation: true,
@@ -68,7 +68,7 @@ export class UsersService implements OnModuleInit {
    * never imports InMemoryUserRepository or any DB-specific class.
    */
   constructor(
-    @Inject('USER_REPOSITORY')
+    @Inject("USER_REPOSITORY")
     private readonly repo: UserRepository,
   ) {}
 
@@ -113,7 +113,7 @@ export class UsersService implements OnModuleInit {
 
     const saved = await this.repo.create(user);
 
-    this.publish<User>('user.created', saved);
+    this.publish<User>("user.created", saved);
     return saved;
   }
 
@@ -134,13 +134,13 @@ export class UsersService implements OnModuleInit {
       }
     }
 
-    const patch: Partial<Pick<User, 'name' | 'email'>> = {};
+    const patch: Partial<Pick<User, "name" | "email">> = {};
     if (input.name  !== undefined) patch.name  = input.name;
     if (input.email !== undefined) patch.email = input.email;
 
     const updated = await this.repo.update(input.id, patch);
 
-    this.publish<User>('user.updated', updated);
+    this.publish<User>("user.updated", updated);
     return updated;
   }
 
@@ -153,7 +153,7 @@ export class UsersService implements OnModuleInit {
   async delete(input: DeleteUserInput): Promise<void> {
     await this.findOne(input.id); // throws 404
     await this.repo.delete(input.id);
-    this.publish<{ id: string }>('user.deleted', { id: input.id });
+    this.publish<{ id: string }>("user.deleted", { id: input.id });
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ export class UsersService implements OnModuleInit {
     };
 
     this.kafkaClient.emit(topic, {
-      key:   (payload as any).id ?? 'unknown',
+      key:   (payload as any).id ?? "unknown",
       value: JSON.stringify(event),
     });
   }

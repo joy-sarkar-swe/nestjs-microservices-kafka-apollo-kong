@@ -1,12 +1,12 @@
 import {
   Controller, Get, Post, Put, Delete,
   Body, Param, HttpCode, HttpStatus,
-} from '@nestjs/common';
-import { BlogsService } from './blogs.service';
-import { CreateBlogInput, UpdateBlogInput } from './dto/blog.input';
-import { Blog } from './entities/blog.entity';
-import { UserServiceClient } from '../common/http/user-service.client';
-import { BlogWithAuthor } from './author/blog-with-author.type';
+} from "@nestjs/common";
+import { BlogsService } from "./blogs.service";
+import { CreateBlogInput, UpdateBlogInput } from "./dto/blog.input";
+import { Blog } from "./entities/blog.entity";
+import { UserServiceClient } from "../common/http/user-service.client";
+import { BlogWithAuthor } from "./author/blog-with-author.type";
 
 /**
  * @controller BlogsRestController
@@ -41,7 +41,7 @@ import { BlogWithAuthor } from './author/blog-with-author.type';
  * ├─ PUT    /blogs/:id     → update blog post (partial)
  * └─ DELETE /blogs/:id     → delete blog post (200)
  */
-@Controller('blogs')
+@Controller("blogs")
 export class BlogsRestController {
   constructor(
     private readonly blogsService: BlogsService,
@@ -87,8 +87,8 @@ export class BlogsRestController {
    * @returns {Promise<BlogWithAuthor>} The blog post with `author` populated (or null if unresolvable).
    * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<BlogWithAuthor> {
+  @Get(":id")
+  async findOne(@Param("id") id: string): Promise<BlogWithAuthor> {
     const blog = await this.blogsService.findOne(id);
     const author = await this.userClient.resolveOne(blog.authorId);
     return this.enrich(blog, author);
@@ -122,10 +122,10 @@ export class BlogsRestController {
    * @returns {Promise<Blog>} The fully updated Blog record.
    * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
-  @Put(':id')
+  @Put(":id")
   async update(
-    @Param('id') id: string,
-    @Body() body: Omit<UpdateBlogInput, 'id'>,
+    @Param("id") id: string,
+    @Body() body: Omit<UpdateBlogInput, "id">,
   ): Promise<Blog> {
     return this.blogsService.update({ id, ...body });
   }
@@ -138,8 +138,8 @@ export class BlogsRestController {
    * @returns {Promise<{ deleted: boolean }>} Confirmation object `{ deleted: true }`.
    * @throws {NotFoundException} 404 when no blog exists with the given id.
    */
-  @Delete(':id')
-  async remove(@Param('id') id: string): Promise<{ deleted: boolean }> {
+  @Delete(":id")
+  async remove(@Param("id") id: string): Promise<{ deleted: boolean }> {
     await this.blogsService.delete({ id });
     return { deleted: true };
   }
@@ -156,7 +156,7 @@ export class BlogsRestController {
    */
   private enrich(
     blog: Blog,
-    author: import('../common/http/user-service.client').ResolvedUser | null,
+    author: import("../common/http/user-service.client").ResolvedUser | null,
   ): BlogWithAuthor {
     return {
       id:       blog.id,

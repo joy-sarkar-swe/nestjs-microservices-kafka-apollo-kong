@@ -1,17 +1,17 @@
 import {
   Resolver, Query, Mutation, Args,
   ResolveReference, ResolveField, Parent, Subscription,
-} from '@nestjs/graphql';
-import { Inject, HttpStatus } from '@nestjs/common';
-import { PubSub } from 'graphql-subscriptions';
-import { BlogsService } from './blogs.service';
-import { Blog, User } from './entities/blog.entity';
+} from "@nestjs/graphql";
+import { Inject, HttpStatus } from "@nestjs/common";
+import { PubSub } from "graphql-subscriptions";
+import { BlogsService } from "./blogs.service";
+import { Blog, User } from "./entities/blog.entity";
 import {
   CreateBlogInput,
   UpdateBlogInput,
   DeleteBlogInput,
   GetBlogArgs,
-} from './dto/blog.input';
+} from "./dto/blog.input";
 import {
   BlogResponse,
   BlogsResponse,
@@ -19,8 +19,8 @@ import {
   BlogResponseType,
   BlogsResponseType,
   BaseApiResponseType,
-} from '../common/responses/api-response.union';
-import { ResponseFactory } from '../common/responses/response.factory';
+} from "../common/responses/api-response.union";
+import { ResponseFactory } from "../common/responses/response.factory";
 
 /**
  * @resolver BlogsResolver
@@ -46,7 +46,7 @@ import { ResponseFactory } from '../common/responses/response.factory';
 export class BlogsResolver {
   constructor(
     private readonly blogsService: BlogsService,
-    @Inject('GQL_PUB_SUB') private readonly pubSub: PubSub,
+    @Inject("GQL_PUB_SUB") private readonly pubSub: PubSub,
   ) {}
 
   // ── QUERIES ───────────────────────────────────────────────────────────────
@@ -58,13 +58,13 @@ export class BlogsResolver {
    *   or an ErrorResponse if the service throws.
    */
   @Query(() => BlogsResponse, {
-    name: 'getBlogs',
-    description: 'Fetch all blog posts.',
+    name: "getBlogs",
+    description: "Fetch all blog posts.",
   })
   async getBlogs(): Promise<BlogsResponseType> {
     try {
       const blogs = await this.blogsService.findAll();
-      return ResponseFactory.blogs(blogs, 'Blog posts retrieved successfully');
+      return ResponseFactory.blogs(blogs, "Blog posts retrieved successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -78,13 +78,13 @@ export class BlogsResolver {
    * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse.
    */
   @Query(() => BlogResponse, {
-    name: 'getBlog',
-    description: 'Fetch one blog post by UUID.',
+    name: "getBlog",
+    description: "Fetch one blog post by UUID.",
   })
-  async getBlog(@Args('input') input: GetBlogArgs): Promise<BlogResponseType> {
+  async getBlog(@Args("input") input: GetBlogArgs): Promise<BlogResponseType> {
     try {
       const blog = await this.blogsService.findOne(input.id);
-      return ResponseFactory.blog(blog, 'Blog post retrieved successfully');
+      return ResponseFactory.blog(blog, "Blog post retrieved successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -101,7 +101,7 @@ export class BlogsResolver {
    * @returns {User} A minimal User reference object containing only the federation @key.
    */
   @ResolveField(() => User, {
-    description: 'Author resolved from user-service via Apollo Federation _entities',
+    description: "Author resolved from user-service via Apollo Federation _entities",
   })
   author(@Parent() blog: Blog): User {
     return { id: blog.authorId };
@@ -118,12 +118,12 @@ export class BlogsResolver {
    * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse.
    */
   @Mutation(() => BlogResponse, {
-    description: 'Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.',
+    description: "Create a blog post. Emits blog.created Kafka event. Subscribers receive push after Kafka consumer fires.",
   })
-  async createBlog(@Args('input') input: CreateBlogInput): Promise<BlogResponseType> {
+  async createBlog(@Args("input") input: CreateBlogInput): Promise<BlogResponseType> {
     try {
       const blog = await this.blogsService.create(input);
-      return ResponseFactory.blog(blog, 'Blog post created successfully', HttpStatus.CREATED);
+      return ResponseFactory.blog(blog, "Blog post created successfully", HttpStatus.CREATED);
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -138,12 +138,12 @@ export class BlogsResolver {
    * @returns {Promise<BlogResponseType>} A BlogSuccessResponse or ErrorResponse (404).
    */
   @Mutation(() => BlogResponse, {
-    description: 'Partially update a blog post. Emits blog.updated Kafka event.',
+    description: "Partially update a blog post. Emits blog.updated Kafka event.",
   })
-  async updateBlog(@Args('input') input: UpdateBlogInput): Promise<BlogResponseType> {
+  async updateBlog(@Args("input") input: UpdateBlogInput): Promise<BlogResponseType> {
     try {
       const blog = await this.blogsService.update(input);
-      return ResponseFactory.blog(blog, 'Blog post updated successfully');
+      return ResponseFactory.blog(blog, "Blog post updated successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -157,12 +157,12 @@ export class BlogsResolver {
    * @returns {Promise<BaseApiResponseType>} A BaseResponse or ErrorResponse (404).
    */
   @Mutation(() => BaseApiResponse, {
-    description: 'Delete a blog post. Emits blog.deleted Kafka event.',
+    description: "Delete a blog post. Emits blog.deleted Kafka event.",
   })
-  async deleteBlog(@Args('input') input: DeleteBlogInput): Promise<BaseApiResponseType> {
+  async deleteBlog(@Args("input") input: DeleteBlogInput): Promise<BaseApiResponseType> {
     try {
       await this.blogsService.delete(input);
-      return ResponseFactory.deleted('Blog post deleted successfully');
+      return ResponseFactory.deleted("Blog post deleted successfully");
     } catch (error) {
       return ResponseFactory.fromException(error);
     }
@@ -183,10 +183,10 @@ export class BlogsResolver {
    * @returns {AsyncIterator} Async iterator over the 'blogCreated' PubSub channel.
    */
   @Subscription(() => Blog, {
-    description: 'Real-time push when a blog post is created.',
+    description: "Real-time push when a blog post is created.",
   })
   blogCreated() {
-    return this.pubSub.asyncIterator('blogCreated');
+    return this.pubSub.asyncIterator("blogCreated");
   }
 
   /**
@@ -196,10 +196,10 @@ export class BlogsResolver {
    * @returns {AsyncIterator} Async iterator over the 'blogUpdated' PubSub channel.
    */
   @Subscription(() => Blog, {
-    description: 'Real-time push when a blog post is updated.',
+    description: "Real-time push when a blog post is updated.",
   })
   blogUpdated() {
-    return this.pubSub.asyncIterator('blogUpdated');
+    return this.pubSub.asyncIterator("blogUpdated");
   }
 
   /**
@@ -210,11 +210,11 @@ export class BlogsResolver {
    * @returns {AsyncIterator} Async iterator over the 'blogDeleted' PubSub channel.
    */
   @Subscription(() => String, {
-    description: 'Real-time push when a blog post is deleted. Returns the deleted blog id.',
+    description: "Real-time push when a blog post is deleted. Returns the deleted blog id.",
     resolve: (payload) => payload.blogDeleted,
   })
   blogDeleted() {
-    return this.pubSub.asyncIterator('blogDeleted');
+    return this.pubSub.asyncIterator("blogDeleted");
   }
 
   // ── FEDERATION ────────────────────────────────────────────────────────────

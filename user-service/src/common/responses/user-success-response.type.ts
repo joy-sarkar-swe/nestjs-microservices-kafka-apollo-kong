@@ -1,6 +1,6 @@
-import { ObjectType, Field, Int } from '@nestjs/graphql';
-import { DateTimeScalar } from '../graphql/scalars';
-import { User } from '../../users/entities/user.entity';
+import { ObjectType, Field, Int } from "@nestjs/graphql";
+import { DateTimeScalar } from "../graphql/scalars";
+import { User } from "../../users/entities/user.entity";
 
 /**
  * @type UserSuccessResponse
@@ -28,22 +28,22 @@ import { User } from '../../users/entities/user.entity';
  *     timestamp:  DateTime!
  *   }
  */
-@ObjectType({ description: 'Success response wrapping a single User entity' })
+@ObjectType({ description: "Success response wrapping a single User entity" })
 export class UserSuccessResponse {
   /** Always true for UserSuccessResponse. */
-  @Field(() => Boolean, { description: 'Always true for success responses' })
+  @Field(() => Boolean, { description: "Always true for success responses" })
   success: boolean;
 
   /** Human-readable success message. */
-  @Field(() => String, { description: 'Human-readable success message' })
+  @Field(() => String, { description: "Human-readable success message" })
   message: string;
 
   /** HTTP-equivalent status code. Typically 200 (fetch/update) or 201 (create). */
-  @Field(() => Int, { description: 'HTTP-equivalent status code' })
+  @Field(() => Int, { description: "HTTP-equivalent status code" })
   statusCode: number;
 
   /** ISO 8601 timestamp of when the response was generated (server clock). */
-  @Field(() => DateTimeScalar, { description: 'Server-side response timestamp' })
+  @Field(() => DateTimeScalar, { description: "Server-side response timestamp" })
   timestamp: Date;
 
   /**
@@ -51,7 +51,7 @@ export class UserSuccessResponse {
    * The resolved User entity.
    * This is the primary payload the client cares about.
    */
-  @Field(() => User, { description: 'The resolved User entity' })
+  @Field(() => User, { description: "The resolved User entity" })
   data: User;
 }
 
@@ -71,7 +71,7 @@ export class UserSuccessResponse {
  *     data:       [User!]!
  *   }
  */
-@ObjectType({ description: 'Success response wrapping a list of User entities' })
+@ObjectType({ description: "Success response wrapping a list of User entities" })
 export class UsersSuccessResponse {
   /** Always true for UsersSuccessResponse. */
   @Field(() => Boolean)
@@ -90,6 +90,6 @@ export class UsersSuccessResponse {
   timestamp: Date;
 
   /** The resolved array of User entities. Empty array when no users exist. */
-  @Field(() => [User], { description: 'The resolved User list' })
+  @Field(() => [User], { description: "The resolved User list" })
   data: User[];
 }

@@ -1,11 +1,11 @@
-import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
-import { ApolloFederationDriver, ApolloFederationDriverConfig } from '@nestjs/apollo';
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { GraphQLModule } from '@nestjs/graphql';
-import { GraphQLScalarType } from 'graphql';
-import { DateTimeResolver } from 'graphql-scalars';
-import { BlogsModule } from './blogs/blogs.module';
+import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
+import { ApolloFederationDriver, ApolloFederationDriverConfig } from "@nestjs/apollo";
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { GraphQLModule } from "@nestjs/graphql";
+import { GraphQLScalarType } from "graphql";
+import { DateTimeResolver } from "graphql-scalars";
+import { BlogsModule } from "./blogs/blogs.module";
 
 /**
  * @module AppModule  (blog-service)
@@ -34,9 +34,9 @@ import { BlogsModule } from './blogs/blogs.module';
       autoSchemaFile: {
         federation: {
           version: 2,
-          importUrl: 'https://specs.apollo.dev/federation/v2.4',
+          importUrl: "https://specs.apollo.dev/federation/v2.4",
         },
-        path: './schema.graphql',
+        path: "./schema.graphql",
       },
       resolvers: {
         DateTime: DateTimeResolver as unknown as GraphQLScalarType,
@@ -48,7 +48,7 @@ import { BlogsModule } from './blogs/blogs.module';
       // ── WebSocket subscriptions (graphql-ws protocol) ─────────────────
       // NestJS v13.2+ and Apollo Federation v2.4+ support this natively.
       subscriptions: {
-        'graphql-ws': true,
+        "graphql-ws": true,
       },
 
       context: ({ req }: { req: Request }) => ({ req }),

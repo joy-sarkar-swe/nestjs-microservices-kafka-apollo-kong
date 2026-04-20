@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
-import { PubSub } from 'graphql-subscriptions';
-import { UsersService } from './users.service';
-import { UsersResolver } from './users.resolver';
-import { UsersRestController } from './users.rest.controller';
-import { UsersKafkaController } from './users.kafka.controller';
-import { InMemoryUserRepository } from './repositories/in-memory-user.repository';
-import { UserEventsGateway } from '../realtime/user-events.gateway';
+import { Module } from "@nestjs/common";
+import { PubSub } from "graphql-subscriptions";
+import { UsersService } from "./users.service";
+import { UsersResolver } from "./users.resolver";
+import { UsersRestController } from "./users.rest.controller";
+import { UsersKafkaController } from "./users.kafka.controller";
+import { InMemoryUserRepository } from "./repositories/in-memory-user.repository";
+import { UserEventsGateway } from "../realtime/user-events.gateway";
 
 /**
  * @module UsersModule
@@ -38,13 +38,13 @@ import { UserEventsGateway } from '../realtime/user-events.gateway';
   providers: [
     // ── Repository ────────────────────────────────────────────────────────
     {
-      provide: 'USER_REPOSITORY',
+      provide: "USER_REPOSITORY",
       useClass: InMemoryUserRepository,
     },
 
     // ── Pub/Sub (GraphQL subscriptions) ───────────────────────────────────
     {
-      provide: 'GQL_PUB_SUB',
+      provide: "GQL_PUB_SUB",
       useFactory: () => new PubSub(),
     },
 

@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 /**
  * @interface ResolvedUser
@@ -86,7 +86,7 @@ export class UserServiceClient implements OnModuleInit {
   private readonly cache = new Map<string, { user: ResolvedUser; expiresAt: number }>();
 
   constructor(private readonly configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('USER_SERVICE_URL', 'http://localhost:4001');
+    this.baseUrl = this.configService.get<string>("USER_SERVICE_URL", "http://localhost:4001");
   }
 
   /**
@@ -197,7 +197,7 @@ export class UserServiceClient implements OnModuleInit {
     try {
       const response = await fetch(`${this.baseUrl}/users/${userId}`, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' },
+        headers: { Accept: "application/json" },
       });
 
       if (!response.ok) {
@@ -235,10 +235,10 @@ export class UserServiceClient implements OnModuleInit {
     const timeout = setTimeout(() => controller.abort(), 5_000);
 
     try {
-      const idsParam = ids.join(',');
+      const idsParam = ids.join(",");
       const response = await fetch(`${this.baseUrl}/users?ids=${idsParam}`, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' },
+        headers: { Accept: "application/json" },
       });
 
       if (!response.ok) {
@@ -281,7 +281,7 @@ export class UserServiceClient implements OnModuleInit {
     );
 
     for (const settlement of settlements) {
-      if (settlement.status === 'fulfilled' && settlement.value.user) {
+      if (settlement.status === "fulfilled" && settlement.value.user) {
         result.set(settlement.value.id, settlement.value.user);
       }
     }
@@ -310,6 +310,6 @@ export class UserServiceClient implements OnModuleInit {
    */
   clearCache(): void {
     this.cache.clear();
-    this.logger.debug('User cache cleared');
+    this.logger.debug("User cache cleared");
   }
 }

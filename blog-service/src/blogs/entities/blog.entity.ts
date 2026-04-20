@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID, Directive } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Directive } from "@nestjs/graphql";
 
 /**
  * @entity User  (stub — blog-service)
@@ -22,17 +22,17 @@ import { ObjectType, Field, ID, Directive } from '@nestjs/graphql';
  *   - Even if the blog store has 1000 blogs, the Router batches all _entities
  *     calls in a single round-trip to user-service (DataLoader-style)
  */
-@ObjectType({ description: 'User reference stub (owned by user-service)' })
-@Directive('@extends')
-@Directive('@key(fields: "id")')
+@ObjectType({ description: "User reference stub (owned by user-service)" })
+@Directive("@extends")
+@Directive("@key(fields: \"id\")")
 export class User {
   /**
    * User UUID — serves as the Apollo Federation @key linking this stub to the
    * full User entity in user-service. Marked @external because blog-service
    * does not own or store User data beyond this id.
    */
-  @Field(() => ID, { description: 'User UUID — federation linking key' })
-  @Directive('@external')
+  @Field(() => ID, { description: "User UUID — federation linking key" })
+  @Directive("@external")
   id: string;
 }
 
@@ -58,19 +58,19 @@ export class User {
  * into a single _entities batch query to user-service — so resolving 100
  * blogs still costs only ONE round-trip to user-service, not 100.
  */
-@ObjectType({ description: 'A blog post owned by blog-service' })
-@Directive('@key(fields: "id")')
+@ObjectType({ description: "A blog post owned by blog-service" })
+@Directive("@key(fields: \"id\")")
 export class Blog {
   /** UUID v4 primary key — doubles as the Apollo Federation @key. */
-  @Field(() => ID, { description: 'Unique blog post identifier (UUID v4)' })
+  @Field(() => ID, { description: "Unique blog post identifier (UUID v4)" })
   id: string;
 
   /** Headline / title of the blog post. */
-  @Field(() => String, { description: 'Post headline' })
+  @Field(() => String, { description: "Post headline" })
   title: string;
 
   /** Full body text of the blog post. */
-  @Field(() => String, { description: 'Post body text' })
+  @Field(() => String, { description: "Post body text" })
   content: string;
 
   /**
@@ -78,7 +78,7 @@ export class Blog {
    * Stored as a plain string; referential integrity is maintained via
    * Kafka events (user.deleted triggers orphan post cleanup).
    */
-  @Field(() => ID, { description: 'UUID of the author — references User.id in user-service' })
+  @Field(() => ID, { description: "UUID of the author — references User.id in user-service" })
   authorId: string;
 
   /**
@@ -90,7 +90,7 @@ export class Blog {
    */
   @Field(() => User, {
     nullable: true,
-    description: 'Author resolved from user-service via Apollo Federation',
+    description: "Author resolved from user-service via Apollo Federation",
   })
   author?: User;
 }

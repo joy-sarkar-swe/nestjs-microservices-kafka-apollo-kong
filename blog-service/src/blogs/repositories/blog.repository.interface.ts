@@ -1,4 +1,4 @@
-import { Blog } from '../entities/blog.entity';
+import { Blog } from "../entities/blog.entity";
 
 /**
  * @interface BlogRepository
@@ -58,7 +58,7 @@ export interface BlogRepository {
    * @param {Partial<Pick<Blog, 'title' | 'content'>>} data - The fields to overwrite.
    * @returns {Promise<Blog>} The fully updated Blog record.
    */
-  update(id: string, data: Partial<Pick<Blog, 'title' | 'content'>>): Promise<Blog>;
+  update(id: string, data: Partial<Pick<Blog, "title" | "content">>): Promise<Blog>;
 
   /**
    * Remove a blog post from the store.

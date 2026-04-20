@@ -1,1 +1,1 @@
-export { DateTimeResolver as DateTimeScalar } from 'graphql-scalars';
+export { DateTimeResolver as DateTimeScalar } from "graphql-scalars";

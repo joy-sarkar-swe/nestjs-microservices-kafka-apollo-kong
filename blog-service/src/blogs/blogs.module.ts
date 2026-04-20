@@ -1,12 +1,12 @@
-import { Module } from '@nestjs/common';
-import { PubSub } from 'graphql-subscriptions';
-import { BlogsService } from './blogs.service';
-import { BlogsResolver } from './blogs.resolver';
-import { BlogsRestController } from './blogs.rest.controller';
-import { BlogsKafkaController } from './blogs.kafka.controller';
-import { InMemoryBlogRepository } from './repositories/in-memory-blog.repository';
-import { BlogEventsGateway } from '../realtime/blog-events.gateway';
-import { UserServiceClient } from '../common/http/user-service.client';
+import { Module } from "@nestjs/common";
+import { PubSub } from "graphql-subscriptions";
+import { BlogsService } from "./blogs.service";
+import { BlogsResolver } from "./blogs.resolver";
+import { BlogsRestController } from "./blogs.rest.controller";
+import { BlogsKafkaController } from "./blogs.kafka.controller";
+import { InMemoryBlogRepository } from "./repositories/in-memory-blog.repository";
+import { BlogEventsGateway } from "../realtime/blog-events.gateway";
+import { UserServiceClient } from "../common/http/user-service.client";
 
 /**
  * @module BlogsModule
@@ -43,13 +43,13 @@ import { UserServiceClient } from '../common/http/user-service.client';
   providers: [
     // ── Repository ────────────────────────────────────────────────────────
     {
-      provide: 'BLOG_REPOSITORY',
+      provide: "BLOG_REPOSITORY",
       useClass: InMemoryBlogRepository,
     },
 
     // ── Pub/Sub (GraphQL subscriptions) ───────────────────────────────────
     {
-      provide: 'GQL_PUB_SUB',
+      provide: "GQL_PUB_SUB",
       useFactory: () => new PubSub(),
     },
 

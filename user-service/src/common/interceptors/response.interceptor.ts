@@ -8,11 +8,11 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
-} from '@nestjs/common';
-import type { Request, Response } from 'express';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { RestResponse } from '../responses/rest-response.interface';
+} from "@nestjs/common";
+import type { Request, Response } from "express";
+import { Observable } from "rxjs";
+import { map } from "rxjs/operators";
+import { RestResponse } from "../responses/rest-response.interface";
 
 /**
  * Global interceptor to wrap all API responses in a consistent RestResponse format.
@@ -27,15 +27,15 @@ export class ResponseInterceptor implements NestInterceptor {
     const res = context.switchToHttp().getResponse<Response>();
 
     // Skip if not an HTTP request (e.g., GraphQL or Kafka)
-    if (!req || !res || typeof res.status !== 'function') {
+    if (!req || !res || typeof res.status !== "function") {
       return next.handle() as Observable<any>;
     }
 
     const method = req.method;
-    const url = req.originalUrl || req.url || '';
+    const url = req.originalUrl || req.url || "";
 
     // Skip wrapping for root API path or health checks if needed
-    if (url === '/' || url === '/api' || url === '/api/') {
+    if (url === "/" || url === "/api" || url === "/api/") {
       return next.handle() as Observable<any>;
     }
 
@@ -45,7 +45,7 @@ export class ResponseInterceptor implements NestInterceptor {
         if (this.isRestResponse(data)) {
           const typed = data as RestResponse;
 
-          if (typeof typed.statusCode !== 'number') {
+          if (typeof typed.statusCode !== "number") {
             typed.statusCode = res.statusCode ?? 200;
           }
 
@@ -57,10 +57,10 @@ export class ResponseInterceptor implements NestInterceptor {
 
         if (
           data &&
-          typeof data === 'object' &&
+          typeof data === "object" &&
           data !== null &&
-          'statusCode' in data &&
-          typeof (data as any).statusCode === 'number'
+          "statusCode" in data &&
+          typeof (data as any).statusCode === "number"
         ) {
           statusCode = (data as { statusCode: number }).statusCode;
         }
@@ -70,17 +70,17 @@ export class ResponseInterceptor implements NestInterceptor {
         }
 
         // Extract message & payload intelligently
-        let message = 'Request successful';
+        let message = "Request successful";
         let payload: unknown = data;
 
-        if (data && typeof data === 'object' && data !== null) {
+        if (data && typeof data === "object" && data !== null) {
           const obj = data as Record<string, unknown>;
 
           // Case: { message: "...", data: {...} } → business response
-          if ('message' in obj && typeof obj.message === 'string') {
+          if ("message" in obj && typeof obj.message === "string") {
             message = obj.message;
 
-            if ('data' in obj) {
+            if ("data" in obj) {
               payload = obj.data;
             } else {
               // Case: only { message: "..." } → no real payload
@@ -110,10 +110,10 @@ export class ResponseInterceptor implements NestInterceptor {
   private isRestResponse(value: unknown): value is RestResponse {
     return (
       value != null &&
-      typeof value === 'object' &&
-      'success' in value &&
-      'timestamp' in value &&
-      'statusCode' in value
+      typeof value === "object" &&
+      "success" in value &&
+      "timestamp" in value &&
+      "statusCode" in value
     );
   }
 }
