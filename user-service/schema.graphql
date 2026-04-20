@@ -2,6 +2,15 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+"""A single field-level validation error"""
+type FieldError {
+  """The input field that failed validation"""
+  field: String!
+
+  """Human-readable description of the failure"""
+  message: String!
+}
+
 """A registered user in the system"""
 type User {
   """Unique user identifier (UUID v4)"""
@@ -12,15 +21,6 @@ type User {
 
   """Unique email address"""
   email: String!
-}
-
-"""A single field-level validation error"""
-type FieldError {
-  """The input field that failed validation"""
-  field: String!
-
-  """Human-readable description of the failure"""
-  message: String!
 }
 
 type Query {
