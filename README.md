@@ -83,48 +83,77 @@
 ## Folder structure
 
 ```
-├── user-service/
-│   ├── src/
-│   │   ├── common/
-│   │   │   ├── filters/        gql-validation.filter.ts
-│   │   │   ├── graphql/        scalars.ts
-│   │   │   ├── kafka/
-│   │   │   │   └── kafka-event.interface.ts  : typed envelope
-│   │   │   ├── responses/
-│   │   │   └── validators/
-│   │   ├── realtime/
-│   │   │   └── user-events.gateway.ts        : Socket.IO /users
-│   │   └── users/
-│   │       ├── repositories/
-│   │       │   ├── user.repository.interface.ts
-│   │       │   └── in-memory-user.repository.ts
-│   │       ├── dto/
-│   │       ├── entities/
-│   │       ├── users.service.ts
-│   │       ├── users.resolver.ts
-│   │       ├── users.rest.controller.ts
-│   │       ├── users.kafka.controller.ts
-│   │       └── users.module.ts
-│   ├── app.module.ts
-│   └── main.ts
+├── apollo-router/
+│   ├── package.json
+│   ├── router
+│   ├── router.yaml
+│   ├── supergraph.graphql
+│   └── supergraph.yaml
 │
-├── blog-service/
-│   └── src/
-│       ├── common/kafka/
-│       │   └── kafka-event.interface.ts
-│       ├── realtime/
-│       │   └── blog-events.gateway.ts           : Socket.IO /blogs
-│       └── blogs/
-│           ├── repositories/
-│           │   ├── blog.repository.interface.ts
-│           │   └── in-memory-blog.repository.ts
-│           ├── blogs.service.ts          ← MODIFIED: uses BlogRepository
-│           ├── blogs.resolver.ts
-│           ├── blogs.rest.controller.ts  ← MODIFIED: async
-│           ├── blogs.kafka.controller.ts
-│           └── blogs.module.ts
+├── kong-gateway/
+│   └── kong.yml
 │
-├── docker-compose.yml   ← MODIFIED: kafka-init creates DLQ topics
+├── services/
+│   ├── user-service/
+│   │   ├── src/
+│   │   │   ├── common/
+│   │   │   │   ├── filters/        gql-validation.filter.ts
+│   │   │   │   ├── graphql/        scalars.ts
+│   │   │   │   ├── kafka/
+│   │   │   │   │   └── kafka-event.interface.ts  : typed envelope
+│   │   │   │   ├── responses/
+│   │   │   │   └── validators/
+│   │   │   ├── realtime/
+│   │   │   │   └── user-events.gateway.ts        : Socket.IO /users
+│   │   │   └── users/
+│   │   │       ├── repositories/
+│   │   │       │   ├── user.repository.interface.ts
+│   │   │       │   └── in-memory-user.repository.ts
+│   │   │       ├── dto/
+│   │   │       ├── entities/
+│   │   │       ├── users.service.ts
+│   │   │       ├── users.resolver.ts
+│   │   │       ├── users.rest.controller.ts
+│   │   │       ├── users.kafka.controller.ts
+│   │   │       └── users.module.ts
+│   │   ├── app.module.ts
+│   │   ├── main.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── blog-service/
+│       ├── src/
+│       │   ├── common/
+│       │   │   ├── filters/
+│       │   │   ├── graphql/
+│       │   │   ├── kafka/
+│       │   │   │   └── kafka-event.interface.ts
+│       │   │   ├── responses/
+│       │   │   └── validators/
+│       │   ├── realtime/
+│       │   │   └── blog-events.gateway.ts           : Socket.IO /blogs
+│       │   └── blogs/
+│       │       ├── repositories/
+│       │       │   ├── blog.repository.interface.ts
+│       │       │   └── in-memory-blog.repository.ts
+│       │       ├── author/
+│       │       │   └── blog-with-author.type.ts
+│       │       ├── dto/
+│       │       │   └── blog.input.ts
+│       │       ├── entities/
+│       │       │   └── blog.entity.ts
+│       │       ├── blogs.service.ts          ← MODIFIED: uses BlogRepository
+│       │       ├── blogs.resolver.ts
+│       │       ├── blogs.rest.controller.ts  ← MODIFIED: async
+│       │       ├── blogs.kafka.controller.ts
+│       │       └── blogs.module.ts
+│       ├── app.module.ts
+│       ├── main.ts
+│       ├── package.json
+│       └── tsconfig.json
+│
+├── docker-compose.yml
+├── package.json
 └── README.md
 ```
 
@@ -217,10 +246,14 @@ docker compose up -d
 docker compose logs kafka-init
 ```
 
-### Step 2 — user-service
+### Step 2 — Services & Gateways
+
+#### Option A: Individual services
+
+**user-service**
 
 ```bash
-cd user-service
+cd services/user-service
 npm install
 npm run start:dev
 # http://localhost:4001/graphql
@@ -228,10 +261,10 @@ npm run start:dev
 # ws://localhost:4001/users     (Socket.IO namespace)
 ```
 
-### Step 3 — blog-service
+**blog-service**
 
 ```bash
-cd blog-service
+cd services/blog-service
 npm install
 npm run start:dev
 # http://localhost:4002/graphql
@@ -239,13 +272,30 @@ npm run start:dev
 # ws://localhost:4002/blogs     (Socket.IO namespace)
 ```
 
-### Step 4 — Apollo Router
+**Apollo Router**
 
 ```bash
 cd apollo-router
+npm install
 rover supergraph compose --config supergraph.yaml > supergraph.graphql
 ./router --config router.yaml --supergraph supergraph.graphql
 # http://localhost:4000
+```
+
+#### Option B: All services at once
+
+```bash
+cd services/user-service
+npm install
+
+cd services/blog-service
+npm install
+
+# From root directory
+npm install
+npm run dev
+
+# All services + gateways start in parallel
 ```
 
 ---
