@@ -6,8 +6,8 @@
   },
   "scripts": {
     "dev": "concurrently -k -n users,blog,router -c blue,green,yellow \"npm run dev:users\" \"npm run dev:blog\" \"npm run dev:router\"",
-    "dev:users": "cd user-service && npm run start:dev",
-    "dev:blog": "cd blog-service && npm run start:dev",
+    "dev:users": "cd services/user-service && npm run start:dev",
+    "dev:blog": "cd services/blog-service && npm run start:dev",
     "dev:router": "wait-on tcp:4001 tcp:4002 && npm --prefix apollo-router run dev"
   }
 }
