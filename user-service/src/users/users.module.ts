@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
 import { PubSub } from "graphql-subscriptions";
-import { UsersService } from "./users.service";
-import { UsersResolver } from "./users.resolver";
-import { UsersRestController } from "./users.rest.controller";
-import { UsersKafkaController } from "./users.kafka.controller";
-import { InMemoryUserRepository } from "./repositories/in-memory-user.repository";
-import { UserEventsGateway } from "../realtime/user-events.gateway";
+import { UsersService } from "./users.service.js";
+import { UsersResolver } from "./users.resolver.js";
+import { UsersRestController } from "./users.rest.controller.js";
+import { UsersKafkaController } from "./users.kafka.controller.js";
+import { InMemoryUserRepository } from "./repositories/in-memory-user.repository.js";
+import { UserEventsGateway } from "../realtime/user-events.gateway.js";
 
 /**
  * @module UsersModule

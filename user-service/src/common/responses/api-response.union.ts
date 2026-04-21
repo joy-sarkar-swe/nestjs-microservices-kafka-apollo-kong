@@ -1,7 +1,7 @@
 import { createUnionType } from "@nestjs/graphql";
-import { ErrorResponse } from "./error-response.type";
-import { BaseResponse } from "./base-response.type";
-import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type";
+import { ErrorResponse } from "./error-response.type.js";
+import { BaseResponse } from "./base-response.type.js";
+import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type.js";
 
 /**
  * @union UserResponse

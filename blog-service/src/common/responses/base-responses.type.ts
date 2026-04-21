@@ -1,6 +1,6 @@
 import { Directive, Field, Int, ObjectType } from "@nestjs/graphql";
-import { DateTimeScalar } from "../graphql/scalars";
-import { FieldError } from "./field-error.type";
+import { DateTimeScalar } from "../graphql/scalars.js";
+import { FieldError } from "./field-error.type.js";
 
 /**
  * @type ErrorResponse

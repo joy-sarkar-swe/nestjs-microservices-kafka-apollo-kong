@@ -1,8 +1,8 @@
 import { Catch, ArgumentsHost, BadRequestException } from "@nestjs/common";
 import { GqlExceptionFilter, GqlArgumentsHost } from "@nestjs/graphql";
-import { transformValidationErrors } from "../validators/validation.util";
-import { ResponseFactory } from "../responses/response.factory";
-import { FieldError } from "../responses/field-error.type";
+import { transformValidationErrors } from "../validators/validation.util.js";
+import { ResponseFactory } from "../responses/response.factory.js";
+import { FieldError } from "../responses/field-error.type.js";
 
 /**
  * @filter GqlValidationFilter  (blog-service)

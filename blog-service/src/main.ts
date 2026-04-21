@@ -1,10 +1,10 @@
-import { ValidationPipe } from "@nestjs/common";
+import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
 import { IoAdapter } from "@nestjs/platform-socket.io";
-import { AppModule } from "./app.module";
-import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
-import { ResponseInterceptor } from "./common/interceptors/response.interceptor";
+import { AppModule } from "./app.module.js";
+import { GlobalExceptionFilter } from "./common/filters/global-exception.filter.js";
+import { ResponseInterceptor } from "./common/interceptors/response.interceptor.js";
 
 /**
  * @bootstrap  (blog-service)
@@ -46,7 +46,6 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
       transform: true,
       exceptionFactory: (errors) => {
-        const { BadRequestException } = require("@nestjs/common");
         return new BadRequestException(errors);
       },
     }),

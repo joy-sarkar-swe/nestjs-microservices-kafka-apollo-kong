@@ -12,7 +12,7 @@ import {
 import type { Request, Response } from "express";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { RestResponse } from "../responses/rest-response.interface";
+import { RestResponse } from "../responses/rest-response.interface.js";
 
 /**
  * Global interceptor to wrap all API responses in a consistent RestResponse format.

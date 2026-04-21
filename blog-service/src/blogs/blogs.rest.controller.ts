@@ -2,11 +2,11 @@ import {
   Controller, Get, Post, Put, Delete,
   Body, Param, HttpCode, HttpStatus,
 } from "@nestjs/common";
-import { BlogsService } from "./blogs.service";
-import { CreateBlogInput, UpdateBlogInput } from "./dto/blog.input";
-import { Blog } from "./entities/blog.entity";
-import { UserServiceClient } from "../common/http/user-service.client";
-import { BlogWithAuthor } from "./author/blog-with-author.type";
+import { BlogsService } from "./blogs.service.js";
+import { CreateBlogInput, UpdateBlogInput } from "./dto/blog.input.js";
+import { Blog } from "./entities/blog.entity.js";
+import { UserServiceClient } from "../common/http/user-service.client.js";
+import { BlogWithAuthor } from "./author/blog-with-author.type.js";
 
 /**
  * @controller BlogsRestController
@@ -156,7 +156,7 @@ export class BlogsRestController {
    */
   private enrich(
     blog: Blog,
-    author: import("../common/http/user-service.client").ResolvedUser | null,
+    author: import("../common/http/user-service.client.js").ResolvedUser | null,
   ): BlogWithAuthor {
     return {
       id:       blog.id,

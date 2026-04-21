@@ -1,9 +1,9 @@
 import { HttpStatus } from "@nestjs/common";
-import { ErrorResponse } from "./error-response.type";
-import { BaseResponse } from "./base-response.type";
-import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type";
-import { FieldError } from "./field-error.type";
-import { User } from "../../users/entities/user.entity";
+import { ErrorResponse } from "./error-response.type.js";
+import { BaseResponse } from "./base-response.type.js";
+import { UserSuccessResponse, UsersSuccessResponse } from "./user-success-response.type.js";
+import { FieldError } from "./field-error.type.js";
+import { User } from "../../users/entities/user.entity.js";
 
 /**
  * @factory ResponseFactory

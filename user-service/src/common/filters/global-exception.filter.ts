@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
-import { GqlValidationFilter } from "./gql-validation.filter";
-import { HttpExceptionFilter } from "./http-exception.filter";
+import { GqlValidationFilter } from "./gql-validation.filter.js";
+import { HttpExceptionFilter } from "./http-exception.filter.js";
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {

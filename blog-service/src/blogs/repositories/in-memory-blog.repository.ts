@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { Blog } from "../entities/blog.entity";
-import { BlogRepository } from "./blog.repository.interface";
+import { Blog } from "../entities/blog.entity.js";
+import { BlogRepository } from "./blog.repository.interface.js";
 
 /**
  * @repository InMemoryBlogRepository

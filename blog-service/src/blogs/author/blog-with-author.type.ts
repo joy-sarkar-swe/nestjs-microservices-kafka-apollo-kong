@@ -1,4 +1,4 @@
-import { ResolvedUser } from "../../common/http/user-service.client";
+import { ResolvedUser } from "../../common/http/user-service.client.js";
 
 /**
  * @type BlogWithAuthor

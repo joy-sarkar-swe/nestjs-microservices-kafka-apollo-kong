@@ -1,9 +1,9 @@
 import { Controller, Logger, Inject } from "@nestjs/common";
 import { EventPattern, Payload, Ctx, KafkaContext, Client, ClientKafka, Transport } from "@nestjs/microservices";
 import { PubSub } from "graphql-subscriptions";
-import { UserEventsGateway } from "../realtime/user-events.gateway";
-import { KafkaEvent } from "../common/kafka/kafka-event.interface";
-import { User } from "./entities/user.entity";
+import { UserEventsGateway } from "../realtime/user-events.gateway.js";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface.js";
+import { User } from "./entities/user.entity.js";
 
 /**
  * @controller UsersKafkaController

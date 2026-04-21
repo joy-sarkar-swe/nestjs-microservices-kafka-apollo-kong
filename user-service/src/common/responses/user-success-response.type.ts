@@ -1,6 +1,6 @@
 import { ObjectType, Field, Int } from "@nestjs/graphql";
-import { DateTimeScalar } from "../graphql/scalars";
-import { User } from "../../users/entities/user.entity";
+import { DateTimeScalar } from "../graphql/scalars.js";
+import { User } from "../../users/entities/user.entity.js";
 
 /**
  * @type UserSuccessResponse

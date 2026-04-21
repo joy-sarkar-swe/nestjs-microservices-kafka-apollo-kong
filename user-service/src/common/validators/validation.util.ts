@@ -1,5 +1,5 @@
 import { ValidationError } from "class-validator";
-import { FieldError } from "../responses/field-error.type";
+import { FieldError } from "../responses/field-error.type.js";
 
 /**
  * @util transformValidationErrors

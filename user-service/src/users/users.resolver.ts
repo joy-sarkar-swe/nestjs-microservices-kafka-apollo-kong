@@ -15,16 +15,16 @@ import {
   UserResponseType,
   UsersResponse,
   UsersResponseType,
-} from "../common/responses/api-response.union";
-import { ResponseFactory } from "../common/responses/response.factory";
+} from "../common/responses/api-response.union.js";
+import { ResponseFactory } from "../common/responses/response.factory.js";
 import {
   CreateUserInput,
   DeleteUserInput,
   GetUserArgs,
   UpdateUserInput,
-} from "./dto/user.input";
-import { User } from "./entities/user.entity";
-import { UsersService } from "./users.service";
+} from "./dto/user.input.js";
+import { User } from "./entities/user.entity.js";
+import { UsersService } from "./users.service.js";
 
 /**
  * @resolver UsersResolver

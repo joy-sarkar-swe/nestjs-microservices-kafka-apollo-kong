@@ -1,6 +1,6 @@
 import { Field, Int, ObjectType } from "@nestjs/graphql";
-import { Blog } from "../../blogs/entities/blog.entity";
-import { DateTimeScalar } from "../graphql/scalars";
+import { Blog } from "../../blogs/entities/blog.entity.js";
+import { DateTimeScalar } from "../graphql/scalars.js";
 
 /**
  * @type BlogSuccessResponse

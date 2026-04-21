@@ -8,7 +8,7 @@ import { ConfigModule } from "@nestjs/config";
 import { GraphQLModule } from "@nestjs/graphql";
 import { GraphQLScalarType } from "graphql";
 import { DateTimeResolver } from "graphql-scalars";
-import { UsersModule } from "./users/users.module";
+import { UsersModule } from "./users/users.module.js";
 
 /**
  * @module AppModule  (user-service)
@@ -50,7 +50,7 @@ import { UsersModule } from "./users/users.module";
       },
       playground: false,
       introspection: true,
-      plugins: [ApolloServerPluginLandingPageLocalDefault()],
+      plugins: [ApolloServerPluginLandingPageLocalDefault() as any],
 
       // ── WebSocket subscriptions (graphql-ws protocol) ─────────────────
       // NestJS v13.2+ and Apollo Federation v2.4+ support this natively.

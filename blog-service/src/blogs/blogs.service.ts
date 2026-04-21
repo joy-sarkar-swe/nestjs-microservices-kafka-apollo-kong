@@ -1,15 +1,19 @@
 import {
+  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
-  Inject,
 } from "@nestjs/common";
 import { Client, ClientKafka, Transport } from "@nestjs/microservices";
 import { v4 as uuidv4 } from "uuid";
-import { Blog } from "./entities/blog.entity";
-import { CreateBlogInput, UpdateBlogInput, DeleteBlogInput } from "./dto/blog.input";
-import { BlogRepository } from "./repositories/blog.repository.interface";
-import { KafkaEvent } from "../common/kafka/kafka-event.interface";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface.js";
+import {
+  CreateBlogInput,
+  DeleteBlogInput,
+  UpdateBlogInput,
+} from "./dto/blog.input.js";
+import { Blog } from "./entities/blog.entity.js";
+import type { BlogRepository } from "./repositories/blog.repository.interface.js";
 
 /**
  * @service BlogsService
@@ -150,7 +154,7 @@ export class BlogsService implements OnModuleInit {
     await this.findOne(input.id); // throws 404
 
     const patch: Partial<Pick<Blog, "title" | "content">> = {};
-    if (input.title   !== undefined) patch.title   = input.title;
+    if (input.title !== undefined) patch.title = input.title;
     if (input.content !== undefined) patch.content = input.content;
 
     const updated = await this.repo.update(input.id, patch);
@@ -240,14 +244,14 @@ export class BlogsService implements OnModuleInit {
   private publish<T extends { id?: string }>(topic: string, payload: T): void {
     const event: KafkaEvent<T> = {
       correlationId: uuidv4(),
-      eventType:     topic,
-      version:       1,
-      timestamp:     new Date().toISOString(),
+      eventType: topic,
+      version: 1,
+      timestamp: new Date().toISOString(),
       payload,
     };
 
     this.kafkaClient.emit(topic, {
-      key:   (payload as any).id ?? "unknown",
+      key: (payload as any).id ?? "unknown",
       value: JSON.stringify(event),
     });
   }

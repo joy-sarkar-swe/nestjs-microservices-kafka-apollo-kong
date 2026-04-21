@@ -7,8 +7,8 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
-import { KafkaEvent } from "../common/kafka/kafka-event.interface";
-import { User } from "../users/entities/user.entity";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface.js";
+import { User } from "../users/entities/user.entity.js";
 
 /**
  * @gateway UserEventsGateway

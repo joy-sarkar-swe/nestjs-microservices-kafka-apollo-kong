@@ -1,4 +1,4 @@
-import { Blog } from "../entities/blog.entity";
+import { Blog } from "../entities/blog.entity.js";
 
 /**
  * @interface BlogRepository

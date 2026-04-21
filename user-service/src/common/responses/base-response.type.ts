@@ -1,5 +1,5 @@
 import { ObjectType, Field, Int, Directive } from "@nestjs/graphql";
-import { DateTimeScalar } from "../graphql/scalars";
+import { DateTimeScalar } from "../graphql/scalars.js";
 
 /**
  * @type BaseResponse

@@ -9,11 +9,11 @@ import {
   Transport,
 } from "@nestjs/microservices";
 import { PubSub } from "graphql-subscriptions";
-import { UserServiceClient } from "../common/http/user-service.client";
-import { KafkaEvent } from "../common/kafka/kafka-event.interface";
-import { BlogEventsGateway } from "../realtime/blog-events.gateway";
-import { BlogsService } from "./blogs.service";
-import { Blog } from "./entities/blog.entity";
+import { UserServiceClient } from "../common/http/user-service.client.js";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface.js";
+import { BlogEventsGateway } from "../realtime/blog-events.gateway.js";
+import { BlogsService } from "./blogs.service.js";
+import { Blog } from "./entities/blog.entity.js";
 
 /**
  * @controller BlogsKafkaController

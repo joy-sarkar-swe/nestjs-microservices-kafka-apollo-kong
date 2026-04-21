@@ -4,9 +4,9 @@ import {
   Body, Param, Query,
   HttpCode, HttpStatus,
 } from "@nestjs/common";
-import { UsersService } from "./users.service";
-import { CreateUserInput, UpdateUserInput } from "./dto/user.input";
-import { User } from "./entities/user.entity";
+import { UsersService } from "./users.service.js";
+import { CreateUserInput, UpdateUserInput } from "./dto/user.input.js";
+import { User } from "./entities/user.entity.js";
 
 /**
  * @controller UsersRestController

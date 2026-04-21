@@ -1,11 +1,14 @@
 import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
-import { ApolloFederationDriver, ApolloFederationDriverConfig } from "@nestjs/apollo";
+import {
+  ApolloFederationDriver,
+  ApolloFederationDriverConfig,
+} from "@nestjs/apollo";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { GraphQLModule } from "@nestjs/graphql";
 import { GraphQLScalarType } from "graphql";
 import { DateTimeResolver } from "graphql-scalars";
-import { BlogsModule } from "./blogs/blogs.module";
+import { BlogsModule } from "./blogs/blogs.module.js";
 
 /**
  * @module AppModule  (blog-service)
@@ -43,7 +46,7 @@ import { BlogsModule } from "./blogs/blogs.module";
       },
       playground: false,
       introspection: true,
-      plugins: [ApolloServerPluginLandingPageLocalDefault()],
+      plugins: [ApolloServerPluginLandingPageLocalDefault() as any],
 
       // ── WebSocket subscriptions (graphql-ws protocol) ─────────────────
       // NestJS v13.2+ and Apollo Federation v2.4+ support this natively.

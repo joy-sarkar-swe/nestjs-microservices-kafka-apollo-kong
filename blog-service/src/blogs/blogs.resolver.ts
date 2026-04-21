@@ -17,16 +17,16 @@ import {
   BlogResponseType,
   BlogsResponse,
   BlogsResponseType,
-} from "src/common/responses/api-response.union";
-import { ResponseFactory } from "src/common/responses/response.factory";
-import { BlogsService } from "./blogs.service";
+} from "../common/responses/api-response.union.js";
+import { ResponseFactory } from "../common/responses/response.factory.js";
+import { BlogsService } from "./blogs.service.js";
 import {
   CreateBlogInput,
   DeleteBlogInput,
   GetBlogArgs,
   UpdateBlogInput,
-} from "./dto/blog.input";
-import { Blog, User } from "./entities/blog.entity";
+} from "./dto/blog.input.js";
+import { Blog, User } from "./entities/blog.entity.js";
 
 /**
  * @resolver BlogsResolver

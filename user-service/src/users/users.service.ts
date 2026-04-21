@@ -1,16 +1,20 @@
 import {
+  ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
-  ConflictException,
   OnModuleInit,
-  Inject,
 } from "@nestjs/common";
 import { Client, ClientKafka, Transport } from "@nestjs/microservices";
 import { v4 as uuidv4 } from "uuid";
-import { User } from "./entities/user.entity";
-import { CreateUserInput, UpdateUserInput, DeleteUserInput } from "./dto/user.input";
-import { UserRepository } from "./repositories/user.repository.interface";
-import { KafkaEvent } from "../common/kafka/kafka-event.interface";
+import { KafkaEvent } from "../common/kafka/kafka-event.interface.js";
+import {
+  CreateUserInput,
+  DeleteUserInput,
+  UpdateUserInput,
+} from "./dto/user.input.js";
+import { User } from "./entities/user.entity.js";
+import type { UserRepository } from "./repositories/user.repository.interface.js";
 
 /**
  * @service UsersService
@@ -102,7 +106,9 @@ export class UsersService implements OnModuleInit {
   async create(input: CreateUserInput): Promise<User> {
     const existing = await this.repo.findByEmail(input.email);
     if (existing) {
-      throw new ConflictException(`Email "${input.email}" is already registered`);
+      throw new ConflictException(
+        `Email "${input.email}" is already registered`,
+      );
     }
 
     const user: User = {
@@ -130,12 +136,14 @@ export class UsersService implements OnModuleInit {
     if (input.email && input.email !== existing.email) {
       const emailOwner = await this.repo.findByEmail(input.email);
       if (emailOwner && emailOwner.id !== input.id) {
-        throw new ConflictException(`Email "${input.email}" is already registered`);
+        throw new ConflictException(
+          `Email "${input.email}" is already registered`,
+        );
       }
     }
 
     const patch: Partial<Pick<User, "name" | "email">> = {};
-    if (input.name  !== undefined) patch.name  = input.name;
+    if (input.name !== undefined) patch.name = input.name;
     if (input.email !== undefined) patch.email = input.email;
 
     const updated = await this.repo.update(input.id, patch);
@@ -186,14 +194,14 @@ export class UsersService implements OnModuleInit {
   private publish<T extends { id?: string }>(topic: string, payload: T): void {
     const event: KafkaEvent<T> = {
       correlationId: uuidv4(),
-      eventType:     topic,
-      version:       1,
-      timestamp:     new Date().toISOString(),
+      eventType: topic,
+      version: 1,
+      timestamp: new Date().toISOString(),
       payload,
     };
 
     this.kafkaClient.emit(topic, {
-      key:   (payload as any).id ?? "unknown",
+      key: (payload as any).id ?? "unknown",
       value: JSON.stringify(event),
     });
   }

@@ -1,11 +1,11 @@
 import { HttpStatus } from "@nestjs/common";
-import { Blog } from "../../blogs/entities/blog.entity";
-import { BaseResponse, ErrorResponse } from "./base-responses.type";
+import { Blog } from "../../blogs/entities/blog.entity.js";
+import { BaseResponse, ErrorResponse } from "./base-responses.type.js";
 import {
   BlogSuccessResponse,
   BlogsSuccessResponse,
-} from "./blog-success-response.type";
-import { FieldError } from "./field-error.type";
+} from "./blog-success-response.type.js";
+import { FieldError } from "./field-error.type.js";
 
 /**
  * @factory ResponseFactory  (blog-service)
